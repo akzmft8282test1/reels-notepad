@@ -98,7 +98,17 @@ app.get("/api/memos/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// 드로잉 데이터 조회 (Fabric.js SVG 기반)
+// 연결선 조회 API
+app.get("/api/connections/:boardId", async (req, res) => {
+  const { boardId } = req.params;
+  const { data, error } = await supabase
+    .from("memo_connections")
+    .select("*")
+    .eq("board_id", boardId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 app.get("/api/drawings/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -109,7 +119,6 @@ app.get("/api/drawings/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// 음성 채널 목록 조회
 app.get("/api/voice-channels/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -120,7 +129,6 @@ app.get("/api/voice-channels/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// 음성 채널 생성
 app.post("/api/voice-channels", async (req, res) => {
   const { board_id, name, max_users } = req.body;
   const { data, error } = await supabase
@@ -132,9 +140,9 @@ app.post("/api/voice-channels", async (req, res) => {
   res.json(data[0]);
 });
 
-// --- Socket.io 실시간 협업 & WebRTC 음성 연결 ---
+// --- Socket.io 실시간 협업 ---
 const activeUsers = new Map();
-const voiceRooms = new Map(); // roomId -> Set of socketIds
+const voiceRooms = new Map();
 
 io.on("connection", (socket) => {
   const req = socket.request;
@@ -171,18 +179,38 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ⚡ Fabric.js 기반 렉 없는 SVG 드로잉 동기화
+  // 1번 기능: 화살표 연결선 저장 및 동기화
+  socket.on("connection:create", async ({ boardId, fromId, toId }) => {
+    if (user?.role === "Viewer") return;
+    const { data } = await supabase
+      .from("memo_connections")
+      .insert([{ board_id: boardId, from_memo_id: fromId, to_memo_id: toId }])
+      .select();
+    if (data) {
+      io.to(boardId).emit("connection:created", data[0]);
+    }
+  });
+
+  // 5번 기능: 카드 리사이즈(크기 변경) 동기화
+  socket.on("memo:resize", async ({ memoId, boardId, width, height }) => {
+    if (user?.role === "Viewer") return;
+    await supabase.from("memos").update({ width, height }).eq("id", memoId);
+    socket.to(boardId).emit("memo:resized", { memoId, width, height });
+  });
+
+  // 8번 기능: 카드 잠금 상태 동기화
+  socket.on("memo:lock", async ({ memoId, boardId, is_locked }) => {
+    if (user?.role === "Viewer") return;
+    await supabase.from("memos").update({ is_locked }).eq("id", memoId);
+    io.to(boardId).emit("memo:locked", { memoId, is_locked });
+  });
+
   socket.on("drawing:path", async ({ boardId, svgPath }) => {
     if (user?.role === "Viewer") return;
     socket.to(boardId).emit("drawing:path", { svgPath });
-
-    await supabase.from("canvas_drawings").insert([
-      {
-        board_id: boardId,
-        path_data: svgPath,
-        author: user?.name,
-      },
-    ]);
+    await supabase
+      .from("canvas_drawings")
+      .insert([{ board_id: boardId, path_data: svgPath, author: user?.name }]);
   });
 
   socket.on("drawing:clear", async (boardId) => {
@@ -220,69 +248,14 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 🎙️ 디스코드형 음성 채널 WebRTC 시그널링
-  socket.on("voice:join", ({ roomId, maxUsers }) => {
-    if (!voiceRooms.has(roomId)) {
-      voiceRooms.set(roomId, new Map());
-    }
-
-    const room = voiceRooms.get(roomId);
-    if (room.size >= maxUsers) {
-      socket.emit("voice:full");
-      return;
-    }
-
-    room.set(socket.id, user?.name || "익명");
-    socket.join(`voice-${roomId}`);
-
-    const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
-      id,
-      name,
-    }));
-    io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
-  });
-
-  socket.on("voice:signal", ({ targetId, signal }) => {
-    io.to(targetId).emit("voice:signal", { senderId: socket.id, signal });
-  });
-
-  socket.on("voice:leave", ({ roomId }) => {
-    if (voiceRooms.has(roomId)) {
-      const room = voiceRooms.get(roomId);
-      room.delete(socket.id);
-      socket.leave(`voice-${roomId}`);
-
-      const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
-        id,
-        name,
-      }));
-      io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
-    }
-  });
-
   socket.on("disconnect", () => {
     io.emit("cursor:remove", socket.id);
     activeUsers.delete(socket.id);
-
-    // 음성 방 퇴장 처리
-    voiceRooms.forEach((room, roomId) => {
-      if (room.has(socket.id)) {
-        room.delete(socket.id);
-        const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
-          id,
-          name,
-        }));
-        io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
-      }
-    });
-
     io.emit("presence:update", Array.from(activeUsers.values()));
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(
-    `🎬 렉 최적화 Fabric.js & 음성 피그마 캔버스: http://localhost:${PORT}`,
-  );
+  console.log(`🎬 10대 기능 풀세트 릴스 캔버스: http://localhost:${PORT}`);
 });

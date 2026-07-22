@@ -5,7 +5,7 @@
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>🎨 피그마 캔버스 Pro (Fabric.js 드로잉 & 디스코드 음성)</title>
+    <title>🎨 피그마 캔버스 Ultimate (TOP 10 풀버전)</title>
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- Quill.js 서식 에디터 -->
@@ -14,7 +14,7 @@
       rel="stylesheet" />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
-    <!-- ⚡ 렉 완벽 해결을 위한 초고속 Fabric.js 캔버스 패키지 -->
+    <!-- Fabric.js 초고속 캔버스 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
     <style>
@@ -32,10 +32,9 @@
         padding: 0;
         background: #e2e8f0;
         overflow: hidden;
-        touch-action: none;
+        user-select: none;
       }
 
-      /* 헤더 피그마 스타일 툴바 */
       header {
         position: fixed;
         top: 15px;
@@ -52,15 +51,16 @@
         z-index: 1000;
       }
 
-      /* 무한 캔버스 메인 레이어 */
+      /* 뷰포트 & 캔버스 줌/팬 처리 */
       #canvasViewport {
         width: 100vw;
         height: 100vh;
-        overflow: auto;
+        overflow: hidden;
         position: relative;
+        cursor: grab;
       }
 
-      #canvas {
+      #canvasContainer {
         width: 6000px;
         height: 6000px;
         background-color: #f8fafc;
@@ -69,9 +69,20 @@
         position: absolute;
         top: 0;
         left: 0;
+        transform-origin: 0 0;
       }
 
-      /* Fabric.js 캔버스 Wrapper 위치 지정 */
+      /* 1번 기능: 연결선 SVG 레이어 */
+      #connectionsSvg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 2;
+      }
+
       .canvas-container {
         position: absolute !important;
         top: 0;
@@ -79,62 +90,96 @@
         z-index: 1;
       }
 
-      /* 캔버스 메모 카드 */
+      /* 5번 기능: 카드 크기 자유 리사이즈 */
       .canvas-card {
         position: absolute;
-        width: 300px;
+        min-width: 200px;
+        min-height: 120px;
         background: var(--card-bg);
         border-radius: 12px;
         border: 2px solid var(--border);
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        padding: 16px;
+        padding: 14px;
         cursor: move;
-        user-select: none;
         z-index: 10;
+        resize: both;
+        overflow: auto;
+        box-sizing: border-box;
+      }
+
+      /* 8번 기능: 카드 잠금 상태 */
+      .canvas-card.locked {
+        border-color: #ef4444;
+        background: #fef2f2;
+        cursor: not-allowed;
+      }
+
+      /* 6번 기능: 포스트잇 스티커 테마 */
+      .canvas-card.sticky-note {
+        background: #fef08a;
+        border-color: #fde047;
       }
 
       .script-box {
-        background: #f1f5f9;
+        background: rgba(255, 255, 255, 0.7);
         padding: 8px;
         border-radius: 6px;
         font-size: 0.85rem;
-        margin-top: 8px;
-        max-height: 140px;
+        margin-top: 6px;
+        max-height: 100px;
         overflow-y: auto;
       }
 
-      .user-cursor {
-        position: absolute;
-        pointer-events: none;
-        font-size: 11px;
-        padding: 3px 8px;
-        background: var(--primary);
-        color: #fff;
-        border-radius: 12px;
-        z-index: 9999;
-        font-weight: bold;
-      }
-
-      /* 디스코드 스타일 음성 위젯 */
-      #voiceWidget {
+      /* 2번 기능: 미니맵 파트 */
+      #minimap {
         position: fixed;
         bottom: 20px;
-        left: 20px;
-        background: #1e1e2e;
-        color: #fff;
-        padding: 14px;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        right: 20px;
+        width: 160px;
+        height: 160px;
+        background: #fff;
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
         z-index: 1000;
-        width: 240px;
+        overflow: hidden;
+      }
+      #minimapViewport {
+        position: absolute;
+        border: 1.5px solid var(--primary);
+        background: rgba(225, 48, 108, 0.1);
+        cursor: pointer;
+      }
+
+      /* 10번 기능: 프롬프터 전용 모달 */
+      #prompterOverlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        color: #fff;
+        z-index: 5000;
+        padding: 40px;
+        box-sizing: border-box;
+      }
+      #prompterContent {
+        font-size: 2.5rem;
+        line-height: 1.8;
+        font-weight: bold;
+        text-align: center;
+        white-space: pre-wrap;
       }
 
       .btn-tool {
-        padding: 6px 12px;
+        padding: 5px 10px;
         border-radius: 6px;
         border: 1px solid #ccc;
         background: #fff;
         cursor: pointer;
+        font-size: 0.8rem;
         font-weight: bold;
       }
       .btn-tool.active {
@@ -166,16 +211,15 @@
   </head>
   <body>
     <header>
-      <div style="font-weight: bold; color: var(--primary); font-size: 0.95rem">
-        🎨 릴스 캔버스 Pro
+      <div style="font-weight: bold; color: var(--primary); font-size: 0.9rem">
+        🎨 캔버스 Ultimate
       </div>
 
-      <!-- 도구 바 (펜 / 지우개 / 이동) -->
       <button
         id="toolSelectBtn"
         class="btn-tool active"
         onclick="setTool('select')">
-        🖐️ 이동
+        🖐️ 선택
       </button>
       <button id="toolPenBtn" class="btn-tool" onclick="setTool('pen')">
         ✏️ 펜
@@ -188,45 +232,35 @@
         type="color"
         id="penColor"
         value="#e1306c"
-        style="
-          width: 32px;
-          height: 28px;
-          padding: 0;
-          border: none;
-          cursor: pointer;
-        "
+        style="width: 28px; height: 24px; border: none; cursor: pointer"
         onchange="updatePenColor()" />
 
+      <!-- 6번 기능: 포스트잇/템플릿 추가 -->
       <button
-        style="
-          background: #e74c3c;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          padding: 6px 10px;
-          cursor: pointer;
-        "
-        onclick="clearDrawings()">
-        전체 지우기
+        class="btn-tool"
+        style="background: #fef08a"
+        onclick="openMemoModal('sticky')">
+        🟨 포스트잇
       </button>
       <button
-        style="
-          background: var(--primary);
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          padding: 6px 10px;
-          font-weight: bold;
-          cursor: pointer;
-        "
-        onclick="openMemoModal('hook')">
-        + 메모 생성
+        class="btn-tool"
+        style="background: var(--primary); color: #fff"
+        onclick="openMemoModal('normal')">
+        + 대본카드
+      </button>
+
+      <!-- 10번 기능: 프롬프터 모드 -->
+      <button
+        class="btn-tool"
+        style="background: #10b981; color: #fff"
+        onclick="startPrompter()">
+        📺 프롬프터
       </button>
 
       <div
         id="onlineCount"
         style="
-          font-size: 0.8rem;
+          font-size: 0.75rem;
           background: #f1f5f9;
           padding: 4px 8px;
           border-radius: 12px;
@@ -239,7 +273,7 @@
           color: #fff;
           border: none;
           border-radius: 6px;
-          padding: 6px 10px;
+          padding: 4px 8px;
           cursor: pointer;
         "
         onclick="logout()">
@@ -247,7 +281,6 @@
       </button>
     </header>
 
-    <!-- 로그인 창 -->
     <div
       id="loginView"
       style="
@@ -299,49 +332,51 @@
       </button>
     </div>
 
-    <!-- 무한 캔버스 뷰포트 -->
+    <!-- 캔버스 메인 뷰포트 -->
     <div id="canvasViewport">
-      <div id="canvas">
+      <div id="canvasContainer">
+        <svg id="connectionsSvg"></svg>
+        <!-- 1번 기능 연결선 -->
         <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
       </div>
     </div>
 
-    <!-- 🎙️ 디스코드 스타일 멀티 음성 채널 위젯 (8번 기능) -->
-    <div id="voiceWidget">
+    <!-- 2번 기능: 미니맵 -->
+    <div id="minimap">
+      <div id="minimapViewport"></div>
+    </div>
+
+    <!-- 10번 기능: 대본 프롬프터 뷰어 -->
+    <div id="prompterOverlay">
       <div
         style="
           display: flex;
           justify-content: space-between;
-          align-items: center;
-          margin-bottom: 8px;
+          margin-bottom: 20px;
         ">
-        <span style="font-weight: bold; font-size: 0.85rem; color: #a6adc8"
-          >🎙️ 음성 협업 채널</span
-        >
+        <span>🎬 대본 촬영 프롬프터 모드 (스크롤 조절 가능)</span>
         <button
           style="
-            font-size: 0.7rem;
-            background: #313244;
-            color: #cdd6f4;
+            background: #ef4444;
+            color: #fff;
             border: none;
-            padding: 2px 6px;
-            border-radius: 4px;
+            padding: 8px 16px;
+            border-radius: 6px;
             cursor: pointer;
           "
-          onclick="openVoiceCreateModal()">
-          + 방생성
+          onclick="stopPrompter()">
+          닫기 ✕
         </button>
       </div>
-      <div id="voiceChannelList" style="font-size: 0.8rem">
-        음성 채널 로딩 중...
-      </div>
+      <div id="prompterContent"></div>
     </div>
 
-    <!-- 메모 편집 모달 -->
+    <!-- 메모 편집 모달 (4번 이미지 첨부 기능 포함) -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
-        <h3>📝 대본/아이디어 메모 편집</h3>
+        <h3>📝 메모 노드 편집</h3>
         <input type="hidden" id="editMemoId" />
+        <input type="hidden" id="isSticky" />
         <label>제목</label>
         <input
           type="text"
@@ -352,21 +387,25 @@
             margin-bottom: 10px;
             box-sizing: border-box;
           " />
-        <label>카테고리</label>
+
+        <!-- 4번 기능: 이미지 URL 입력 -->
+        <label>🖼️ 이미지/레퍼런스 URL (선택)</label>
         <input
           type="text"
-          id="editCategory"
-          placeholder="#정보, #챌린지"
+          id="editImageUrl"
+          placeholder="https://..."
           style="
             width: 100%;
             padding: 8px;
             margin-bottom: 10px;
             box-sizing: border-box;
           " />
-        <label>대본 서식 편집</label>
+
+        <label>대본 및 내용</label>
         <div
           id="quillEditor"
-          style="height: 140px; background: #fff; margin-bottom: 10px"></div>
+          style="height: 120px; background: #fff; margin-bottom: 10px"></div>
+
         <div style="display: flex; gap: 10px; margin-top: 15px">
           <button
             style="
@@ -398,106 +437,101 @@
       </div>
     </div>
 
-    <!-- 음성방 생성 모달 -->
-    <div id="voiceModal" class="modal-bg">
-      <div class="modal">
-        <h3>🎙️ 음성 채널 생성 (인원 제한)</h3>
-        <label>방 이름</label>
-        <input
-          type="text"
-          id="voiceRoomName"
-          placeholder="예: 대본 회의실 1"
-          style="
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-          " />
-        <label>최대 인원 제한</label>
-        <select
-          id="voiceMaxUsers"
-          style="
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-          ">
-          <option value="2">2명 (1:1 회의)</option>
-          <option value="4" selected>4명 (팀 회의)</option>
-          <option value="8">8명 (전체 회의)</option>
-        </select>
-        <button
-          style="
-            width: 100%;
-            background: #313244;
-            color: #00ff66;
-            border: none;
-            padding: 10px;
-            border-radius: 6px;
-            font-weight: bold;
-            cursor: pointer;
-          "
-          onclick="createVoiceChannel()">
-          채널 만들기
-        </button>
-      </div>
-    </div>
-
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
-      let fCanvas = null; // Fabric.js 인스턴스
+      let fCanvas = null;
       let quill = null;
       let memosCache = {};
+      let connections = [];
 
-      let isDraggingCard = false;
-      let dragTarget = null;
-      let dragOffset = { x: 0, y: 0 };
-      let activeVoiceRoomId = null;
+      // 1번 기능: 줌 & 팬 상태값
+      let scale = 1;
+      let panX = 0,
+        panY = 0;
+      let isPanning = false;
+      let startX, startY;
+
+      let connectingFromId = null; // 1번 연결선 연결 대기 저장
 
       window.onload = () => {
-        // ⚡ Fabric.js 초고속 패키지 기반 캔버스 초기화 (렉 제거)
         fCanvas = new fabric.Canvas("fabricCanvas", {
           isDrawingMode: false,
           selection: true,
         });
-
         fCanvas.freeDrawingBrush.width = 3;
         fCanvas.freeDrawingBrush.color =
           document.getElementById("penColor").value;
 
-        // 드로잉 완성 시 SVG 변환 후 가볍게 브로드캐스트
         fCanvas.on("path:created", function (e) {
-          const pathSvg = e.path.toSVG();
           socket.emit("drawing:path", {
             boardId: currentBoardId,
-            svgPath: pathSvg,
+            svgPath: e.path.toSVG(),
           });
         });
 
-        // 지우개 모드 시 터치/클릭한 드로잉 객체 삭제
-        fCanvas.on("mouse:down", function (options) {
-          if (fCanvas.currentTool === "eraser" && options.target) {
-            fCanvas.remove(options.target);
+        // 1번 기능: 줌 & 팬 (Ctrl + 휠 줌, 스페이스바 / 마우스 드래그 팬)
+        const viewport = document.getElementById("canvasViewport");
+        viewport.addEventListener("wheel", (e) => {
+          if (e.ctrlKey) {
+            e.preventDefault();
+            scale += e.deltaY * -0.001;
+            scale = Math.min(Math.max(0.2, scale), 3);
+            updateTransform();
           }
+        });
+
+        viewport.addEventListener("mousedown", (e) => {
+          if (
+            e.button === 1 ||
+            e.spaceKey ||
+            e.target.id === "canvasViewport"
+          ) {
+            isPanning = true;
+            startX = e.clientX - panX;
+            startY = e.clientY - panY;
+          }
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (isPanning) {
+            panX = e.clientX - startX;
+            panY = e.clientY - startY;
+            updateTransform();
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          isPanning = false;
         });
 
         init();
       };
 
-      // 펜 / 지우개 / 이동 도구 설정
+      function updateTransform() {
+        const container = document.getElementById("canvasContainer");
+        container.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        updateMinimap();
+      }
+
+      // 2번 기능: 미니맵 업데이트
+      function updateMinimap() {
+        const minimapVp = document.getElementById("minimapViewport");
+        const ratio = 160 / 6000;
+        minimapVp.style.width = `${(window.innerWidth / scale) * ratio}px`;
+        minimapVp.style.height = `${(window.innerHeight / scale) * ratio}px`;
+        minimapVp.style.left = `${Math.abs(panX) * ratio}px`;
+        minimapVp.style.top = `${Math.abs(panY) * ratio}px`;
+      }
+
       function setTool(tool) {
         document
           .querySelectorAll(".btn-tool")
           .forEach((btn) => btn.classList.remove("active"));
-        fCanvas.currentTool = tool;
-
         if (tool === "pen") {
           document.getElementById("toolPenBtn").classList.add("active");
           fCanvas.isDrawingMode = true;
-          fCanvas.freeDrawingBrush.color =
-            document.getElementById("penColor").value;
         } else if (tool === "eraser") {
           document.getElementById("toolEraserBtn").classList.add("active");
           fCanvas.isDrawingMode = false;
@@ -508,90 +542,16 @@
       }
 
       function updatePenColor() {
-        if (fCanvas) {
+        if (fCanvas)
           fCanvas.freeDrawingBrush.color =
             document.getElementById("penColor").value;
-        }
       }
-
-      function clearDrawings() {
-        if (confirm("캔버스의 모든 손그림을 지우시겠습니까?")) {
-          socket.emit("drawing:clear", currentBoardId);
-        }
-      }
-
-      // 소켓 이벤트: 드로잉 패스 수신
-      socket.on("drawing:path", ({ svgPath }) => {
-        fabric.loadSVGFromString(svgPath, function (objects, options) {
-          const obj = fabric.util.groupSVGElements(objects, options);
-          fCanvas.add(obj);
-          fCanvas.renderAll();
-        });
-      });
-
-      socket.on("drawing:cleared", () => {
-        fCanvas.clear();
-      });
-
-      // 마우스 커서 동기화
-      document.addEventListener("mousemove", (e) => {
-        socket.emit("cursor:move", { x: e.clientX, y: e.clientY });
-
-        if (isDraggingCard && dragTarget) {
-          const newX = e.clientX - dragOffset.x;
-          const newY = e.clientY - dragOffset.y;
-
-          dragTarget.style.left = `${newX}px`;
-          dragTarget.style.top = `${newY}px`;
-
-          socket.emit("memo:move", {
-            memoId: dragTarget.dataset.id,
-            boardId: currentBoardId,
-            pos_x: newX,
-            pos_y: newY,
-          });
-        }
-      });
-
-      document.addEventListener("mouseup", () => {
-        isDraggingCard = false;
-        dragTarget = null;
-      });
-
-      socket.on("cursor:update", (data) => {
-        let cursorEl = document.getElementById(`cursor-${data.socketId}`);
-        if (!cursorEl) {
-          cursorEl = document.createElement("div");
-          cursorEl.id = `cursor-${data.socketId}`;
-          cursorEl.className = "user-cursor";
-          document.body.appendChild(cursorEl);
-        }
-        cursorEl.innerText = `🖱️ ${data.name}`;
-        cursorEl.style.left = `${data.x + 10}px`;
-        cursorEl.style.top = `${data.y + 10}px`;
-      });
-
-      socket.on("cursor:remove", (socketId) => {
-        const cursorEl = document.getElementById(`cursor-${socketId}`);
-        if (cursorEl) cursorEl.remove();
-      });
-
-      socket.on("memo:moved", ({ memoId, pos_x, pos_y }) => {
-        const card = document.getElementById(`card-${memoId}`);
-        if (card) {
-          card.style.left = `${pos_x}px`;
-          card.style.top = `${pos_y}px`;
-        }
-      });
 
       async function init() {
         quill = new Quill("#quillEditor", {
           theme: "snow",
-          modules: {
-            toolbar: [["bold", "italic", "underline"], [{ color: [] }]],
-          },
+          modules: { toolbar: [["bold", "italic"]] },
         });
-
         const res = await fetch("/api/me");
         const data = await res.json();
         if (data.loggedIn) {
@@ -626,8 +586,8 @@
           currentBoardId = boards[0].id;
           socket.emit("board:join", currentBoardId);
           loadMemos();
+          loadConnections();
           loadDrawings();
-          loadVoiceChannels();
         }
       }
 
@@ -635,6 +595,12 @@
         const res = await fetch(`/api/memos/${currentBoardId}`);
         const memos = await res.json();
         renderCanvas(memos);
+      }
+
+      async function loadConnections() {
+        const res = await fetch(`/api/connections/${currentBoardId}`);
+        connections = await res.json();
+        renderConnections();
       }
 
       async function loadDrawings() {
@@ -650,55 +616,163 @@
         });
       }
 
+      // 렌더링 (3, 4, 5, 6, 8번 기능 융합)
       function renderCanvas(memos) {
         memosCache = {};
-        const canvas = document.getElementById("canvas");
-        const oldCards = canvas.querySelectorAll(".canvas-card");
+        const container = document.getElementById("canvasContainer");
+        const oldCards = container.querySelectorAll(".canvas-card");
         oldCards.forEach((c) => c.remove());
 
         memos.forEach((memo, index) => {
           memosCache[memo.id] = memo;
           const card = document.createElement("div");
-          card.className = "canvas-card";
+          card.className = `canvas-card ${memo.category === "#포스트잇" ? "sticky-note" : ""} ${memo.is_locked ? "locked" : ""}`;
           card.id = `card-${memo.id}`;
           card.dataset.id = memo.id;
 
-          const posX = memo.pos_x || 120 + (index % 4) * 340;
-          const posY = memo.pos_y || 120 + Math.floor(index / 4) * 280;
-
-          card.style.left = `${posX}px`;
-          card.style.top = `${posY}px`;
+          card.style.left = `${memo.pos_x || 120 + (index % 4) * 340}px`;
+          card.style.top = `${memo.pos_y || 120 + Math.floor(index / 4) * 280}px`;
+          if (memo.width) card.style.width = `${memo.width}px`;
+          if (memo.height) card.style.height = `${memo.height}px`;
 
           card.innerHTML = `
-            <div style="display:flex; justify-size:space-between; align-items:center; margin-bottom:6px;">
-              <span style="font-size:0.75rem; background:#ffe6ed; color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:bold;">${memo.category || "#아이디어"}</span>
-              <span style="font-size:0.75rem; color:#888;">✍️ ${memo.author}</span>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.7rem; font-weight:bold;">${memo.category || "#노드"}</span>
+              <div>
+                <button style="font-size:0.6rem;" onclick="toggleLock('${memo.id}', ${!memo.is_locked})">${memo.is_locked ? "🔒" : "🔓"}</button>
+                <button style="font-size:0.6rem;" onclick="startConnection('${memo.id}')">🔗</button>
+              </div>
             </div>
             <h4 style="margin:4px 0;">${memo.title}</h4>
-            <div class="script-box">${memo.rich_content || memo.script || "내용 없음"}</div>
-
-            <div style="display:flex; gap:4px; margin-top:10px;">
-              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60; color:#fff; border:none; border-radius:4px; cursor:pointer;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
-            </div>
+            ${memo.image_url ? `<img src="${memo.image_url}" style="width:100%; max-height:80px; object-fit:cover; border-radius:4px; margin-top:4px;">` : ""}
+            <div class="script-box">${memo.rich_content || memo.script || ""}</div>
+            <button style="font-size:0.65rem; margin-top:6px; background:#27ae60; color:#fff; border:none; padding:2px 6px; border-radius:4px; cursor:pointer;" onclick="editMemo('${memo.id}')">✏️ 편집</button>
           `;
 
+          // 5번 기능: 크기 변경(Resize) 감지 이벤트
+          new ResizeObserver(() => {
+            socket.emit("memo:resize", {
+              memoId: memo.id,
+              boardId: currentBoardId,
+              width: card.offsetWidth,
+              height: card.offsetHeight,
+            });
+            renderConnections();
+          }).observe(card);
+
+          // 드래그 이동
+          let isCardDragging = false,
+            offsetLeft = 0,
+            offsetTop = 0;
           card.addEventListener("mousedown", (e) => {
-            if (fCanvas.isDrawingMode || e.target.tagName === "BUTTON") return;
-            isDraggingCard = true;
-            dragTarget = card;
-            dragOffset.x = e.clientX - card.offsetLeft;
-            dragOffset.y = e.clientY - card.offsetTop;
+            if (
+              memo.is_locked ||
+              e.target.tagName === "BUTTON" ||
+              fCanvas.isDrawingMode
+            )
+              return;
+            isCardDragging = true;
+            offsetLeft = e.clientX - card.offsetLeft;
+            offsetTop = e.clientY - card.offsetTop;
           });
 
-          canvas.appendChild(card);
+          window.addEventListener("mousemove", (e) => {
+            if (isCardDragging) {
+              const newX = e.clientX - offsetLeft;
+              const newY = e.clientY - offsetTop;
+              card.style.left = `${newX}px`;
+              card.style.top = `${newY}px`;
+              socket.emit("memo:move", {
+                memoId: memo.id,
+                boardId: currentBoardId,
+                pos_x: newX,
+                pos_y: newY,
+              });
+              renderConnections();
+            }
+          });
+
+          window.addEventListener("mouseup", () => {
+            isCardDragging = false;
+          });
+          container.appendChild(card);
         });
+
+        renderConnections();
+      }
+
+      // 1번 기능: 화살표 연결선 SVG 그리기
+      function renderConnections() {
+        const svg = document.getElementById("connectionsSvg");
+        svg.innerHTML = "";
+        connections.forEach((conn) => {
+          const fromEl = document.getElementById(`card-${conn.from_memo_id}`);
+          const toEl = document.getElementById(`card-${conn.to_memo_id}`);
+          if (fromEl && toEl) {
+            const x1 = fromEl.offsetLeft + fromEl.offsetWidth / 2;
+            const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
+            const x2 = toEl.offsetLeft + toEl.offsetWidth / 2;
+            const y2 = toEl.offsetTop + toEl.offsetHeight / 2;
+
+            const line = document.createElementNS(
+              "http://www.w3.org/2000/svg",
+              "line",
+            );
+            line.setAttribute("x1", x1);
+            line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2);
+            line.setAttribute("y2", y2);
+            line.setAttribute("stroke", "#e1306c");
+            line.setAttribute("stroke-width", "3");
+            line.setAttribute("stroke-dasharray", "5,5");
+            svg.appendChild(line);
+          }
+        });
+      }
+
+      function startConnection(memoId) {
+        if (!connectingFromId) {
+          connectingFromId = memoId;
+          alert("연결할 대상 카드의 🔗 버튼을 눌러주세요.");
+        } else {
+          socket.emit("connection:create", {
+            boardId: currentBoardId,
+            fromId: connectingFromId,
+            toId: memoId,
+          });
+          connectingFromId = null;
+        }
+      }
+
+      // 8번 기능: 잠금 토글
+      function toggleLock(memoId, is_locked) {
+        socket.emit("memo:lock", {
+          memoId,
+          boardId: currentBoardId,
+          is_locked,
+        });
+      }
+
+      // 10번 기능: 프롬프터 모드 실행
+      function startPrompter() {
+        const text = Object.values(memosCache)
+          .map((m) => `[${m.title}]\n${m.script}`)
+          .join("\n\n--------------------\n\n");
+        document.getElementById("prompterContent").innerText =
+          text || "작성된 대본이 없습니다.";
+        document.getElementById("prompterOverlay").style.display = "block";
+      }
+      function stopPrompter() {
+        document.getElementById("prompterOverlay").style.display = "none";
       }
 
       function openMemoModal(type) {
         document.getElementById("editMemoId").value = "";
+        document.getElementById("isSticky").value =
+          type === "sticky" ? "true" : "false";
         document.getElementById("editTitle").value =
-          type === "hook" ? "⚡ 3초 후킹 대본" : "📖 아이디어 대본";
-        document.getElementById("editCategory").value = "#릴스";
+          type === "sticky" ? "📌 스티커 아이디어" : "🎬 릴스 대본";
+        document.getElementById("editImageUrl").value = "";
         quill.clipboard.dangerouslyPasteHTML("<p>내용을 작성하세요...</p>");
         document.getElementById("memoModal").style.display = "flex";
       }
@@ -706,10 +780,9 @@
       function editMemo(memoId) {
         const memo = memosCache[memoId];
         if (!memo) return;
-
         document.getElementById("editMemoId").value = memo.id;
         document.getElementById("editTitle").value = memo.title;
-        document.getElementById("editCategory").value = memo.category || "";
+        document.getElementById("editImageUrl").value = memo.image_url || "";
         quill.clipboard.dangerouslyPasteHTML(
           memo.rich_content || memo.script || "",
         );
@@ -718,11 +791,13 @@
 
       function saveMemoModal() {
         const id = document.getElementById("editMemoId").value;
+        const isSticky = document.getElementById("isSticky").value === "true";
         socket.emit("memo:save", {
           id: id || undefined,
           board_id: currentBoardId,
-          title: document.getElementById("editTitle").value || "무제 메모",
-          category: document.getElementById("editCategory").value || "#일반",
+          title: document.getElementById("editTitle").value || "무제 노드",
+          category: isSticky ? "#포스트잇" : "#릴스대본",
+          image_url: document.getElementById("editImageUrl").value,
           rich_content: quill.root.innerHTML,
           script: quill.getText(),
           pos_x: Math.floor(Math.random() * 300) + 100,
@@ -730,51 +805,6 @@
           author: currentUser.name,
         });
         closeModal("memoModal");
-      }
-
-      // 🎙️ 음성 채널 로직
-      async function loadVoiceChannels() {
-        const res = await fetch(`/api/voice-channels/${currentBoardId}`);
-        const channels = await res.json();
-        const listEl = document.getElementById("voiceChannelList");
-        listEl.innerHTML = channels
-          .map(
-            (c) => `
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px; background:#313244; border-radius:6px;">
-            <span>🔊 ${c.name} (최대 ${c.max_users}명)</span>
-            <button style="font-size:0.7rem; background:#a6e3a1; color:#000; border:none; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="joinVoiceChannel('${c.id}', ${c.max_users})">참여</button>
-          </div>
-        `,
-          )
-          .join("");
-      }
-
-      function openVoiceCreateModal() {
-        document.getElementById("voiceModal").style.display = "flex";
-      }
-
-      async function createVoiceChannel() {
-        const name = document.getElementById("voiceRoomName").value;
-        const max_users = document.getElementById("voiceMaxUsers").value;
-        if (!name) return;
-
-        await fetch("/api/voice-channels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ board_id: currentBoardId, name, max_users }),
-        });
-
-        closeModal("voiceModal");
-        loadVoiceChannels();
-      }
-
-      function joinVoiceChannel(roomId, maxUsers) {
-        if (activeVoiceRoomId) {
-          socket.emit("voice:leave", { roomId: activeVoiceRoomId });
-        }
-        activeVoiceRoomId = roomId;
-        socket.emit("voice:join", { roomId, maxUsers });
-        alert("음성 채널에 연결되었습니다. (마이크 허용 필요)");
       }
 
       function closeModal(id) {
@@ -787,9 +817,18 @@
       });
 
       socket.on("memo:updated", () => loadMemos());
-      socket.on("voice:full", () =>
-        alert("해당 음성 채널 인원이 가득 찼습니다!"),
-      );
+      socket.on("connection:created", (conn) => {
+        connections.push(conn);
+        renderConnections();
+      });
+      socket.on("memo:resized", () => renderConnections());
+      socket.on("memo:locked", () => loadMemos());
+      socket.on("drawing:path", ({ svgPath }) => {
+        fabric.loadSVGFromString(svgPath, function (objects, options) {
+          fCanvas.add(fabric.util.groupSVGElements(objects, options));
+          fCanvas.renderAll();
+        });
+      });
 
       init();
     </script>
