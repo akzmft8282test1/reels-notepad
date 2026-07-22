@@ -19,7 +19,6 @@
         color: #333;
       }
 
-      /* 상단 헤더 */
       header {
         background: #fff;
         border-bottom: 1px solid #ddd;
@@ -27,7 +26,6 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        sticky: top;
       }
       .logo {
         font-weight: bold;
@@ -53,7 +51,6 @@
         background: none;
       }
 
-      /* 슬라이드 햄버거 메뉴 */
       .sidebar {
         position: fixed;
         right: -300px;
@@ -69,9 +66,6 @@
       .sidebar.open {
         right: 0;
       }
-      .sidebar h3 {
-        margin-top: 0;
-      }
       .board-list {
         list-style: none;
         padding: 0;
@@ -82,14 +76,12 @@
         border-radius: 6px;
         margin-bottom: 5px;
       }
-      .board-list li:hover,
-      .board-list li.active {
+      .board-list li:hover {
         background: #ffe6ed;
         color: var(--primary);
         font-weight: bold;
       }
 
-      /* 메인 컨테이너 */
       .container {
         max-width: 1000px;
         margin: 20px auto;
@@ -126,7 +118,6 @@
         opacity: 0.9;
       }
 
-      /* 카드 스타일 */
       .card-grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
@@ -138,7 +129,6 @@
         border-radius: 8px;
         border: 1px solid #e0e0e0;
         padding: 16px;
-        position: relative;
       }
       .badge {
         display: inline-block;
@@ -157,16 +147,32 @@
         min-height: 60px;
         white-space: pre-wrap;
       }
-      .typing-status {
-        font-size: 0.8rem;
-        color: var(--primary);
-        font-style: italic;
-        height: 18px;
+
+      /* 관리자 히든 콘솔 스타일 */
+      #adminConsole {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 400px;
+        background: #1e1e1e;
+        color: #00ff66;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        font-family: monospace;
       }
-      .time-calculator {
-        font-size: 0.75rem;
-        color: #2b8a3e;
-        margin-top: 4px;
+      #adminConsole input {
+        background: #2b2b2b;
+        color: #fff;
+        border: 1px solid #444;
+      }
+      #adminConsole button {
+        background: #00ff66;
+        color: #000;
+        margin-top: 15px;
       }
     </style>
   </head>
@@ -179,7 +185,6 @@
       </div>
     </header>
 
-    <!-- 우상단 햄버거 메인 사이드바 -->
     <div id="sidebar" class="sidebar">
       <div
         style="
@@ -201,7 +206,6 @@
     </div>
 
     <div class="container">
-      <!-- 로그인 폼 -->
       <div id="loginView" class="auth-box">
         <h2>🔐 접속하기</h2>
         <p style="font-size: 0.85rem; color: #666">
@@ -212,7 +216,6 @@
         <button onclick="login()">로그인</button>
       </div>
 
-      <!-- 메인 대시보드 View -->
       <div id="mainView" style="display: none">
         <div
           style="
@@ -225,9 +228,38 @@
             + 새 아이디어/대본 추가
           </button>
         </div>
-
         <div class="card-grid" id="memoGrid"></div>
       </div>
+    </div>
+
+    <!-- 숨겨진 관리자 콘솔 -->
+    <div id="adminConsole">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h3 style="margin: 0; color: #00ff66">⚡ ADMIN CONSOLE</h3>
+        <span style="cursor: pointer; color: #fff" onclick="closeAdminConsole()"
+          >✕</span
+        >
+      </div>
+      <p style="font-size: 0.8rem; color: #aaa">신규 팀원 계정을 추가합니다.</p>
+
+      <label>닉네임 (이름)</label>
+      <input type="text" id="adminNewName" placeholder="예: 김PD" />
+
+      <label>아이디</label>
+      <input type="text" id="adminNewUsername" placeholder="예: pd_kim" />
+
+      <label>비밀번호</label>
+      <input
+        type="password"
+        id="adminNewPassword"
+        placeholder="비밀번호 입력" />
+
+      <button onclick="addNewUser()">계정 추가하기</button>
     </div>
 
     <script>
@@ -235,7 +267,6 @@
       let currentUser = null;
       let currentBoardId = null;
 
-      // 초기 접속 검증
       async function init() {
         const res = await fetch("/api/me");
         const data = await res.json();
@@ -317,7 +348,7 @@
         const grid = document.getElementById("memoGrid");
         grid.innerHTML = "";
         memos.forEach((memo) => {
-          const estSeconds = Math.ceil((memo.script || "").length / 6); // 1초당 평균 6글자 추정
+          const estSeconds = Math.ceil((memo.script || "").length / 6);
           const card = document.createElement("div");
           card.className = "card";
           card.id = `memo-${memo.id}`;
@@ -326,12 +357,10 @@
           <span class="badge" style="background:#fff0f6; color:#d6336c">${memo.status}</span>
           <h3 style="margin: 10px 0 5px 0;">${memo.title}</h3>
           <p style="font-size:0.9rem; color:#555;">${memo.content || ""}</p>
-          
           <div class="script-box">🎬 <b>대본:</b><br>${memo.script || "작성된 대본이 없습니다."}</div>
-          <div class="time-calculator">⏱️ 예상 영상 길이: 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
-          <div class="typing-status" id="typing-${memo.id}"></div>
-
-          <div style="display:flex; justify-size:space-between; align-items:center; margin-top:12px; font-size:0.8rem; color:#888;">
+          <div style="font-size: 0.75rem; color: #2b8a3e; margin-top: 4px;">⏱️ 예상 영상 길이: 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
+          <div style="font-size:0.8rem; color: #e1306c; font-style: italic; height:18px;" id="typing-${memo.id}"></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:0.8rem; color:#888;">
             <span>✍️ ${memo.author} (최종 수정: ${memo.last_edited_by || memo.author})</span>
             <button style="width:auto; padding:4px 8px;" onclick="likeMemo('${memo.id}')">❤️ ${memo.likes || 0}</button>
           </div>
@@ -358,7 +387,67 @@
         socket.emit("memo:like", { memoId, boardId: currentBoardId });
       }
 
-      // --- 소켓 이벤트 수신 ---
+      // --- 이스터에그: /admin 경로 접속 시 커맨드 감지 ---
+      // 커맨드 순서: 상(Up), 상(Up), 하(Down), 우(Right), 상(Up), 좌(Left), 상(Up)
+      const secretSequence = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowUp",
+        "ArrowLeft",
+        "ArrowUp",
+        "ArrowRight",
+        "ArrowUp",
+      ];
+      let inputBuffer = [];
+
+      document.addEventListener("keydown", (e) => {
+        if (window.location.pathname !== "/admin") return;
+
+        inputBuffer.push(e.key);
+        if (inputBuffer.length > secretSequence.length) {
+          inputBuffer.shift();
+        }
+
+        // 비밀키 순서 일치 체크
+        if (JSON.stringify(inputBuffer) === JSON.stringify(secretSequence)) {
+          document.getElementById("adminConsole").style.display = "block";
+          inputBuffer = [];
+        }
+      });
+
+      function closeAdminConsole() {
+        document.getElementById("adminConsole").style.display = "none";
+      }
+
+      // 콘솔에서 계정 추가 함수
+      async function addNewUser() {
+        const name = document.getElementById("adminNewName").value;
+        const username = document.getElementById("adminNewUsername").value;
+        const password = document.getElementById("adminNewPassword").value;
+
+        if (!name || !username || !password) {
+          alert("모든 입력란을 채워주세요.");
+          return;
+        }
+
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, username, password }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert(`계정이 성공적으로 추가되었습니다! (${data.user.name})`);
+          document.getElementById("adminNewName").value = "";
+          document.getElementById("adminNewUsername").value = "";
+          document.getElementById("adminNewPassword").value = "";
+          closeAdminConsole();
+        } else {
+          alert(`오류: ${data.message}`);
+        }
+      }
+
       socket.on("presence:update", (users) => {
         document.getElementById("onlineCount").innerText =
           `접속자: ${users.length}명`;
@@ -370,16 +459,6 @@
 
       socket.on("memo:liked", ({ memoId, likes }) => {
         loadMemos(currentBoardId);
-      });
-
-      socket.on("memo:typing", ({ memoId, user }) => {
-        const el = document.getElementById(`typing-${memoId}`);
-        if (el) {
-          el.innerText = `✍️ ${user}님이 수정하는 중...`;
-          setTimeout(() => {
-            el.innerText = "";
-          }, 2000);
-        }
       });
 
       init();
