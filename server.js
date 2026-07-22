@@ -30,6 +30,14 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
+async function logAction(username, action, details) {
+  try {
+    await supabase.from("audit_logs").insert([{ username, action, details }]);
+  } catch (e) {
+    console.error("Log error:", e);
+  }
+}
+
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
@@ -64,6 +72,7 @@ app.post("/api/login", async (req, res) => {
     name: user.name,
     role: user.role || "Member",
   };
+  await logAction(user.username, "LOGIN", "로그인 성공");
   res.json({ success: true, user: req.session.user });
 });
 
@@ -73,10 +82,45 @@ app.get("/api/me", (req, res) => {
 });
 
 app.post("/api/logout", (req, res) => {
+  if (req.session.user)
+    logAction(req.session.user.username, "LOGOUT", "로그아웃");
   req.session.destroy();
   res.json({ success: true });
 });
 
+// 관리자 계정 추가
+app.post("/api/admin/users", async (req, res) => {
+  const { name, username, password, role } = req.body;
+  if (!name || !username || !password)
+    return res
+      .status(400)
+      .json({ success: false, message: "모든 항목을 입력해주세요." });
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { data, error } = await supabase
+      .from("allowed_users")
+      .insert([
+        { name, username, password: hashedPassword, role: role || "Member" },
+      ])
+      .select();
+
+    if (error)
+      return res.status(500).json({ success: false, message: error.message });
+    await logAction(
+      req.session.user?.username || "ADMIN",
+      "CREATE_USER",
+      `계정 생성: ${username}`,
+    );
+    res.json({ success: true, user: data[0] });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "서버 오류가 발생했습니다." });
+  }
+});
+
+// 게시판 목록 및 생성
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -86,6 +130,19 @@ app.get("/api/boards", async (req, res) => {
   res.json(data);
 });
 
+app.post("/api/boards", async (req, res) => {
+  if (!req.session.user || req.session.user.role === "Viewer")
+    return res.status(403).json({ message: "권한이 없습니다." });
+  const { name, description } = req.body;
+  const { data, error } = await supabase
+    .from("boards")
+    .insert([{ name, description }])
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data[0]);
+});
+
+// 메모 목록 조회 (휴지통 제외)
 app.get("/api/memos/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -93,38 +150,115 @@ app.get("/api/memos/:boardId", async (req, res) => {
     .select("*")
     .eq("board_id", boardId)
     .eq("is_deleted", false)
+    .order("is_pinned", { ascending: false })
     .order("updated_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-// 연결선 조회 API
-app.get("/api/connections/:boardId", async (req, res) => {
+// 휴지통 및 복구 API
+app.get("/api/trash/:boardId", async (req, res) => {
   const { boardId } = req.params;
+  const sixtyDaysAgo = new Date(
+    Date.now() - 60 * 24 * 60 * 60 * 1000,
+  ).toISOString();
+  const { data, error } = await supabase
+    .from("memos")
+    .select("*")
+    .eq("board_id", boardId)
+    .eq("is_deleted", true)
+    .gte("deleted_at", sixtyDaysAgo)
+    .order("deleted_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post("/api/memos/restore", async (req, res) => {
+  if (!req.session.user || req.session.user.role === "Viewer")
+    return res.status(403).json({ message: "권한이 없습니다." });
+  const { memoId } = req.body;
+  const { data, error } = await supabase
+    .from("memos")
+    .update({ is_deleted: false, deleted_at: null })
+    .eq("id", memoId)
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  io.to(data[0].board_id).emit("memo:updated", data[0]);
+  res.json({ success: true });
+});
+
+// 칸반 드래그 이동 API
+app.post("/api/memos/status", async (req, res) => {
+  if (!req.session.user || req.session.user.role === "Viewer")
+    return res.status(403).json({ message: "권한이 없습니다." });
+  const { memoId, status } = req.body;
+  const { data, error } = await supabase
+    .from("memos")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", memoId)
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  io.to(data[0].board_id).emit("memo:updated", data[0]);
+  res.json({ success: true, memo: data[0] });
+});
+
+// 댓글, 히스토리, 활동로그 API
+app.get("/api/comments/:memoId", async (req, res) => {
+  const { data, error } = await supabase
+    .from("comments")
+    .select("*")
+    .eq("memo_id", req.params.memoId)
+    .order("created_at", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.get("/api/history/:memoId", async (req, res) => {
+  const { data, error } = await supabase
+    .from("script_history")
+    .select("*")
+    .eq("memo_id", req.params.memoId)
+    .order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.get("/api/admin/logs", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== "Admin")
+    return res.status(403).json({ message: "권한이 없습니다." });
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// 캔버스 연동 API (연결선, 드로잉, 음성채널)
+app.get("/api/connections/:boardId", async (req, res) => {
   const { data, error } = await supabase
     .from("memo_connections")
     .select("*")
-    .eq("board_id", boardId);
+    .eq("board_id", req.params.boardId);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.get("/api/drawings/:boardId", async (req, res) => {
-  const { boardId } = req.params;
   const { data, error } = await supabase
     .from("canvas_drawings")
     .select("*")
-    .eq("board_id", boardId);
+    .eq("board_id", req.params.boardId);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
 app.get("/api/voice-channels/:boardId", async (req, res) => {
-  const { boardId } = req.params;
   const { data, error } = await supabase
     .from("voice_channels")
     .select("*")
-    .eq("board_id", boardId);
+    .eq("board_id", req.params.boardId);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
@@ -140,9 +274,8 @@ app.post("/api/voice-channels", async (req, res) => {
   res.json(data[0]);
 });
 
-// --- Socket.io 실시간 협업 ---
+// --- Socket.io 실시간 통신 ---
 const activeUsers = new Map();
-const voiceRooms = new Map();
 
 io.on("connection", (socket) => {
   const req = socket.request;
@@ -179,30 +312,98 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 1번 기능: 화살표 연결선 저장 및 동기화
-  socket.on("connection:create", async ({ boardId, fromId, toId }) => {
+  socket.on("memo:save", async (memoData) => {
     if (user?.role === "Viewer") return;
-    const { data } = await supabase
-      .from("memo_connections")
-      .insert([{ board_id: boardId, from_memo_id: fromId, to_memo_id: toId }])
-      .select();
-    if (data) {
-      io.to(boardId).emit("connection:created", data[0]);
+    memoData.last_edited_by = user?.name || "익명";
+    memoData.updated_at = new Date().toISOString();
+
+    let result;
+    if (memoData.id) {
+      const { data: oldMemo } = await supabase
+        .from("memos")
+        .select("script")
+        .eq("id", memoData.id)
+        .single();
+      if (oldMemo && oldMemo.script !== memoData.script) {
+        await supabase.from("script_history").insert([
+          {
+            memo_id: memoData.id,
+            script: oldMemo.script,
+            edited_by: user?.name || "익명",
+          },
+        ]);
+      }
+      const { data } = await supabase
+        .from("memos")
+        .update(memoData)
+        .eq("id", memoData.id)
+        .select();
+      result = data ? data[0] : null;
+    } else {
+      const { data } = await supabase.from("memos").insert([memoData]).select();
+      result = data ? data[0] : null;
+    }
+
+    if (result) {
+      await logAction(
+        user?.username || "ANON",
+        "SAVE_MEMO",
+        `저장: ${result.title}`,
+      );
+      io.to(result.board_id).emit("memo:updated", result);
     }
   });
 
-  // 5번 기능: 카드 리사이즈(크기 변경) 동기화
-  socket.on("memo:resize", async ({ memoId, boardId, width, height }) => {
+  socket.on("memo:delete", async ({ memoId, boardId }) => {
     if (user?.role === "Viewer") return;
-    await supabase.from("memos").update({ width, height }).eq("id", memoId);
-    socket.to(boardId).emit("memo:resized", { memoId, width, height });
+    await supabase
+      .from("memos")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .eq("id", memoId);
+    await logAction(user?.username || "ANON", "DELETE_MEMO", `삭제: ${memoId}`);
+    io.to(boardId).emit("memo:updated", { id: memoId, is_deleted: true });
   });
 
-  // 8번 기능: 카드 잠금 상태 동기화
-  socket.on("memo:lock", async ({ memoId, boardId, is_locked }) => {
+  socket.on("comment:add", async ({ memoId, boardId, content }) => {
+    if (!content || user?.role === "Viewer") return;
+    const { data: comment } = await supabase
+      .from("comments")
+      .insert([{ memo_id: memoId, author: user?.name || "익명", content }])
+      .select();
+    if (comment) {
+      io.to(boardId).emit("comment:added", { memoId, comment: comment[0] });
+      const mentions = content.match(/@([^\s]+)/g);
+      if (mentions) {
+        mentions.forEach((m) => {
+          io.emit("notification:mention", {
+            targetName: m.replace("@", ""),
+            from: user?.name,
+            content,
+            memoId,
+          });
+        });
+      }
+    }
+  });
+
+  socket.on("memo:like", async ({ memoId, boardId }) => {
+    const { data: memo } = await supabase
+      .from("memos")
+      .select("likes")
+      .eq("id", memoId)
+      .single();
+    if (memo) {
+      const newLikes = (memo.likes || 0) + 1;
+      await supabase.from("memos").update({ likes: newLikes }).eq("id", memoId);
+      io.to(boardId).emit("memo:liked", { memoId, likes: newLikes });
+    }
+  });
+
+  // 캔버스 동기화 이벤트
+  socket.on("memo:move", async ({ memoId, boardId, pos_x, pos_y }) => {
     if (user?.role === "Viewer") return;
-    await supabase.from("memos").update({ is_locked }).eq("id", memoId);
-    io.to(boardId).emit("memo:locked", { memoId, is_locked });
+    await supabase.from("memos").update({ pos_x, pos_y }).eq("id", memoId);
+    socket.to(boardId).emit("memo:moved", { memoId, pos_x, pos_y });
   });
 
   socket.on("drawing:path", async ({ boardId, svgPath }) => {
@@ -219,33 +420,13 @@ io.on("connection", (socket) => {
     io.to(boardId).emit("drawing:cleared");
   });
 
-  socket.on("memo:move", async ({ memoId, boardId, pos_x, pos_y }) => {
+  socket.on("connection:create", async ({ boardId, fromId, toId }) => {
     if (user?.role === "Viewer") return;
-    await supabase.from("memos").update({ pos_x, pos_y }).eq("id", memoId);
-    socket.to(boardId).emit("memo:moved", { memoId, pos_x, pos_y });
-  });
-
-  socket.on("memo:save", async (memoData) => {
-    if (user?.role === "Viewer") return;
-    memoData.last_edited_by = user?.name || "익명";
-    memoData.updated_at = new Date().toISOString();
-
-    let result;
-    if (memoData.id) {
-      const { data } = await supabase
-        .from("memos")
-        .update(memoData)
-        .eq("id", memoData.id)
-        .select();
-      result = data ? data[0] : null;
-    } else {
-      const { data } = await supabase.from("memos").insert([memoData]).select();
-      result = data ? data[0] : null;
-    }
-
-    if (result) {
-      io.to(result.board_id).emit("memo:updated", result);
-    }
+    const { data } = await supabase
+      .from("memo_connections")
+      .insert([{ board_id: boardId, from_memo_id: fromId, to_memo_id: toId }])
+      .select();
+    if (data) io.to(boardId).emit("connection:created", data[0]);
   });
 
   socket.on("disconnect", () => {
@@ -257,5 +438,7 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎬 10대 기능 풀세트 릴스 캔버스: http://localhost:${PORT}`);
+  console.log(
+    `🎬 원본+캔버스 완벽 통합 서버 실행 중: http://localhost:${PORT}`,
+  );
 });

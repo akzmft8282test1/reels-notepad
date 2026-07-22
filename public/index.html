@@ -2,10 +2,8 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>🎨 피그마 캔버스 Ultimate (TOP 10 풀버전)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎬 릴스 대회 아이디어 & 대본 협업 스튜디오</title>
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- Quill.js 서식 에디터 -->
@@ -14,7 +12,7 @@
       rel="stylesheet" />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
-    <!-- Fabric.js 초고속 캔버스 -->
+    <!-- Fabric.js 초고속 캔버스 패키지 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
     <style>
@@ -22,44 +20,119 @@
         --primary: #e1306c;
         --bg: #f8f9fa;
         --card-bg: #ffffff;
-        --border: #cbd5e1;
+        --text: #333333;
+        --border: #e0e0e0;
+      }
+
+      body.dark-mode {
+        --bg: #121212;
+        --card-bg: #1e1e1e;
+        --text: #e0e0e0;
+        --border: #333333;
       }
 
       body {
         font-family:
           -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         margin: 0;
-        padding: 0;
-        background: #e2e8f0;
-        overflow: hidden;
-        user-select: none;
+        background: var(--bg);
+        color: var(--text);
+        overflow-x: hidden;
       }
 
       header {
-        position: fixed;
-        top: 15px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ffffff;
-        border: 1px solid var(--border);
-        padding: 6px 16px;
-        border-radius: 30px;
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        z-index: 100;
+      }
+      .logo {
+        font-weight: bold;
+        font-size: 1.2rem;
+        color: var(--primary);
+      }
+      .header-right {
         display: flex;
         align-items: center;
         gap: 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-        z-index: 1000;
+      }
+      .online-users {
+        font-size: 0.85rem;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 4px 10px;
+        border-radius: 12px;
       }
 
-      /* 뷰포트 & 캔버스 줌/팬 처리 */
-      #canvasViewport {
+      /* 칸반 보드 레이아웃 */
+      .kanban-container {
+        display: flex;
+        gap: 15px;
+        overflow-x: auto;
+        padding-bottom: 20px;
+        margin-top: 20px;
+      }
+      .kanban-col {
+        flex: 1;
+        min-width: 280px;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px dashed var(--border);
+      }
+      .kanban-col-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        padding: 14px;
+        margin-bottom: 15px;
+        position: relative;
+      }
+      .card.pinned {
+        border: 2px solid var(--primary);
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 6px;
+        font-size: 0.75rem;
+        border-radius: 4px;
+        background: #eee;
+        color: #333;
+        margin-right: 4px;
+      }
+
+      .script-box {
+        background: rgba(0, 0, 0, 0.05);
+        padding: 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        margin-top: 8px;
+        white-space: pre-wrap;
+      }
+      .char-warning {
+        color: #d9534f;
+        font-size: 0.75rem;
+        font-weight: bold;
+        display: none;
+      }
+
+      /* 무한 캔버스 전용 뷰포트 */
+      #canvasView {
+        display: none;
         width: 100vw;
-        height: 100vh;
+        height: calc(100vh - 60px);
         overflow: hidden;
         position: relative;
-        cursor: grab;
       }
-
       #canvasContainer {
         width: 6000px;
         height: 6000px;
@@ -71,8 +144,6 @@
         left: 0;
         transform-origin: 0 0;
       }
-
-      /* 1번 기능: 연결선 SVG 레이어 */
       #connectionsSvg {
         position: absolute;
         top: 0;
@@ -82,112 +153,63 @@
         pointer-events: none;
         z-index: 2;
       }
-
       .canvas-container {
         position: absolute !important;
         top: 0;
         left: 0;
         z-index: 1;
       }
-
-      /* 5번 기능: 카드 크기 자유 리사이즈 */
       .canvas-card {
         position: absolute;
-        min-width: 200px;
-        min-height: 120px;
+        min-width: 240px;
         background: var(--card-bg);
-        border-radius: 12px;
+        border-radius: 8px;
         border: 2px solid var(--border);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        padding: 14px;
-        cursor: move;
+        padding: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         z-index: 10;
         resize: both;
         overflow: auto;
-        box-sizing: border-box;
       }
 
-      /* 8번 기능: 카드 잠금 상태 */
-      .canvas-card.locked {
-        border-color: #ef4444;
-        background: #fef2f2;
-        cursor: not-allowed;
-      }
-
-      /* 6번 기능: 포스트잇 스티커 테마 */
-      .canvas-card.sticky-note {
-        background: #fef08a;
-        border-color: #fde047;
-      }
-
-      .script-box {
-        background: rgba(255, 255, 255, 0.7);
-        padding: 8px;
-        border-radius: 6px;
-        font-size: 0.85rem;
+      /* 영상 미리보기 호버 팝업 */
+      .video-preview-wrapper {
+        position: relative;
+        display: inline-block;
         margin-top: 6px;
-        max-height: 100px;
-        overflow-y: auto;
       }
-
-      /* 2번 기능: 미니맵 파트 */
-      #minimap {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        width: 160px;
-        height: 160px;
-        background: #fff;
-        border: 2px solid var(--border);
+      .video-preview-btn {
+        font-size: 0.75rem;
+        background: #3897f0;
+        color: white;
+        padding: 3px 6px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .video-preview-popup {
+        display: none;
+        position: absolute;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 260px;
+        height: 180px;
+        background: #000;
         border-radius: 8px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
         z-index: 1000;
         overflow: hidden;
+        border: 2px solid var(--primary);
       }
-      #minimapViewport {
-        position: absolute;
-        border: 1.5px solid var(--primary);
-        background: rgba(225, 48, 108, 0.1);
-        cursor: pointer;
+      .video-preview-wrapper:hover .video-preview-popup {
+        display: block;
       }
-
-      /* 10번 기능: 프롬프터 전용 모달 */
-      #prompterOverlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: #000;
-        color: #fff;
-        z-index: 5000;
-        padding: 40px;
-        box-sizing: border-box;
-      }
-      #prompterContent {
-        font-size: 2.5rem;
-        line-height: 1.8;
-        font-weight: bold;
-        text-align: center;
-        white-space: pre-wrap;
+      .video-preview-popup iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
       }
 
-      .btn-tool {
-        padding: 5px 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        background: #fff;
-        cursor: pointer;
-        font-size: 0.8rem;
-        font-weight: bold;
-      }
-      .btn-tool.active {
-        background: var(--primary);
-        color: white;
-        border-color: var(--primary);
-      }
-
+      /* 모달 및 UI */
       .modal-bg {
         display: none;
         position: fixed;
@@ -201,261 +223,473 @@
         align-items: center;
       }
       .modal {
-        background: #fff;
+        background: var(--card-bg);
         padding: 20px;
-        border-radius: 12px;
+        border-radius: 10px;
         width: 90%;
         max-width: 500px;
+        max-height: 85vh;
+        overflow-y: auto;
+      }
+      .reels-phone-frame {
+        width: 270px;
+        height: 480px;
+        background: #000;
+        color: #fff;
+        border-radius: 20px;
+        padding: 15px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin: 0 auto;
+      }
+      .user-cursor {
+        position: absolute;
+        pointer-events: none;
+        font-size: 11px;
+        padding: 2px 6px;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 8px;
+        z-index: 9999;
+        white-space: nowrap;
+      }
+
+      .sidebar {
+        position: fixed;
+        right: -300px;
+        top: 0;
+        width: 260px;
+        height: 100%;
+        background: var(--card-bg);
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+        transition: 0.3s;
+        z-index: 500;
+        padding: 20px;
+      }
+      .sidebar.open {
+        right: 0;
+      }
+
+      input,
+      textarea,
+      select,
+      button {
+        width: 100%;
+        padding: 8px;
+        margin-top: 6px;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text);
+      }
+      button {
+        background: var(--primary);
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+
+      #adminConsole {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 420px;
+        background: #1e1e1e;
+        color: #00ff66;
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 3000;
+        font-family: monospace;
       }
     </style>
   </head>
   <body>
     <header>
-      <div style="font-weight: bold; color: var(--primary); font-size: 0.9rem">
-        🎨 캔버스 Ultimate
+      <div class="logo">🎬 릴스 메모장 Pro</div>
+      <div class="header-right">
+        <!-- 뷰 전환 토글 (원본 칸반 뷰 vs 무한 캔버스 뷰) -->
+        <button
+          onclick="switchView('kanban')"
+          style="width: auto; padding: 4px 8px; background: #4a90e2">
+          📋 칸반 뷰
+        </button>
+        <button
+          onclick="switchView('canvas')"
+          style="width: auto; padding: 4px 8px; background: #27ae60">
+          🎨 캔버스 뷰
+        </button>
+        <button
+          onclick="toggleDarkMode()"
+          style="width: auto; padding: 4px 8px">
+          🌙/☀️
+        </button>
+        <button
+          onclick="toggleTrashModal()"
+          style="width: auto; padding: 4px 8px">
+          🗑️ 휴지통
+        </button>
+        <div id="onlineCount" class="online-users">접속자: 0명</div>
+        <button
+          onclick="toggleSidebar()"
+          style="
+            width: auto;
+            background: none;
+            color: var(--text);
+            font-size: 1.4rem;
+          ">
+          ☰
+        </button>
       </div>
-
-      <button
-        id="toolSelectBtn"
-        class="btn-tool active"
-        onclick="setTool('select')">
-        🖐️ 선택
-      </button>
-      <button id="toolPenBtn" class="btn-tool" onclick="setTool('pen')">
-        ✏️ 펜
-      </button>
-      <button id="toolEraserBtn" class="btn-tool" onclick="setTool('eraser')">
-        🧹 지우개
-      </button>
-
-      <input
-        type="color"
-        id="penColor"
-        value="#e1306c"
-        style="width: 28px; height: 24px; border: none; cursor: pointer"
-        onchange="updatePenColor()" />
-
-      <!-- 6번 기능: 포스트잇/템플릿 추가 -->
-      <button
-        class="btn-tool"
-        style="background: #fef08a"
-        onclick="openMemoModal('sticky')">
-        🟨 포스트잇
-      </button>
-      <button
-        class="btn-tool"
-        style="background: var(--primary); color: #fff"
-        onclick="openMemoModal('normal')">
-        + 대본카드
-      </button>
-
-      <!-- 10번 기능: 프롬프터 모드 -->
-      <button
-        class="btn-tool"
-        style="background: #10b981; color: #fff"
-        onclick="startPrompter()">
-        📺 프롬프터
-      </button>
-
-      <div
-        id="onlineCount"
-        style="
-          font-size: 0.75rem;
-          background: #f1f5f9;
-          padding: 4px 8px;
-          border-radius: 12px;
-        ">
-        접속자: 0명
-      </div>
-      <button
-        style="
-          background: #64748b;
-          color: #fff;
-          border: none;
-          border-radius: 6px;
-          padding: 4px 8px;
-          cursor: pointer;
-        "
-        onclick="logout()">
-        로그아웃
-      </button>
     </header>
 
-    <div
-      id="loginView"
-      style="
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #fff;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        z-index: 3000;
-        text-align: center;
-      ">
-      <h2>🔐 릴스 캔버스 접속</h2>
-      <input
-        type="text"
-        id="username"
-        placeholder="아이디"
-        style="
-          width: 100%;
-          padding: 8px;
-          margin-bottom: 10px;
-          box-sizing: border-box;
-        " /><br />
-      <input
-        type="password"
-        id="password"
-        placeholder="비밀번호"
-        style="
-          width: 100%;
-          padding: 8px;
-          margin-bottom: 10px;
-          box-sizing: border-box;
-        " /><br />
-      <button
-        style="
-          width: 100%;
-          background: var(--primary);
-          color: #fff;
-          padding: 10px;
-          border: none;
-          border-radius: 6px;
-          font-weight: bold;
-          cursor: pointer;
-        "
-        onclick="login()">
-        접속하기
-      </button>
-    </div>
-
-    <!-- 캔버스 메인 뷰포트 -->
-    <div id="canvasViewport">
-      <div id="canvasContainer">
-        <svg id="connectionsSvg"></svg>
-        <!-- 1번 기능 연결선 -->
-        <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
-      </div>
-    </div>
-
-    <!-- 2번 기능: 미니맵 -->
-    <div id="minimap">
-      <div id="minimapViewport"></div>
-    </div>
-
-    <!-- 10번 기능: 대본 프롬프터 뷰어 -->
-    <div id="prompterOverlay">
+    <div id="sidebar" class="sidebar">
       <div
         style="
           display: flex;
           justify-content: space-between;
-          margin-bottom: 20px;
+          align-items: center;
         ">
-        <span>🎬 대본 촬영 프롬프터 모드 (스크롤 조절 가능)</span>
-        <button
-          style="
-            background: #ef4444;
-            color: #fff;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-          "
-          onclick="stopPrompter()">
-          닫기 ✕
-        </button>
+        <h3>📌 게시판 목록</h3>
+        <span style="cursor: pointer" onclick="toggleSidebar()">✕</span>
       </div>
-      <div id="prompterContent"></div>
+      <ul id="boardList" style="list-style: none; padding: 0"></ul>
+      <hr />
+      <h4>+ 새 게시판</h4>
+      <input type="text" id="newBoardName" placeholder="게시판 이름" />
+      <button onclick="createBoard()">생성</button>
+      <button
+        style="background: #e74c3c; margin-top: 10px"
+        onclick="exportTXT()">
+        📄 전체 대본 TXT 내보내기
+      </button>
+      <button style="background: #666; margin-top: 10px" onclick="logout()">
+        로그아웃
+      </button>
     </div>
 
-    <!-- 메모 편집 모달 (4번 이미지 첨부 기능 포함) -->
+    <!-- 로그인 화면 -->
+    <div
+      id="loginView"
+      style="max-width: 360px; margin: 80px auto; text-align: center">
+      <h2>🔐 접속하기</h2>
+      <input type="text" id="username" placeholder="아이디" />
+      <input type="password" id="password" placeholder="비밀번호" />
+      <button onclick="login()">로그인</button>
+    </div>
+
+    <!-- 메인 메인 구역 1: 원본 칸반 보드 뷰 -->
+    <div
+      id="kanbanView"
+      class="container"
+      style="
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 15px;
+        display: none;
+      ">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h2 id="currentBoardTitle">기본 게시판</h2>
+        <button
+          id="addMemoBtn"
+          style="width: auto"
+          onclick="openMemoEditModal()">
+          + 아이디어/대본 작성
+        </button>
+      </div>
+
+      <div class="kanban-container">
+        <div
+          class="kanban-col"
+          ondragover="allowDrop(event)"
+          ondrop="drop(event, '아이디어')">
+          <div class="kanban-col-title">💡 아이디어</div>
+          <div id="col-아이디어"></div>
+        </div>
+        <div
+          class="kanban-col"
+          ondragover="allowDrop(event)"
+          ondrop="drop(event, '대본작성')">
+          <div class="kanban-col-title">✍️ 대본작성</div>
+          <div id="col-대본작성"></div>
+        </div>
+        <div
+          class="kanban-col"
+          ondragover="allowDrop(event)"
+          ondrop="drop(event, '촬영예정')">
+          <div class="kanban-col-title">🎥 촬영예정</div>
+          <div id="col-촬영예정"></div>
+        </div>
+        <div
+          class="kanban-col"
+          ondragover="allowDrop(event)"
+          ondrop="drop(event, '완료')">
+          <div class="kanban-col-title">✅ 완료</div>
+          <div id="col-완료"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 메인 구역 2: 피그마 무한 캔버스 뷰 -->
+    <div id="canvasView">
+      <div
+        style="
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          z-index: 100;
+          display: flex;
+          gap: 6px;
+          background: rgba(255, 255, 255, 0.9);
+          padding: 6px;
+          border-radius: 8px;
+          border: 1px solid #ccc;
+        ">
+        <button
+          style="width: auto; padding: 4px 8px"
+          onclick="setTool('select')">
+          🖐️ 선택/이동
+        </button>
+        <button style="width: auto; padding: 4px 8px" onclick="setTool('pen')">
+          ✏️ 펜
+        </button>
+        <button
+          style="width: auto; padding: 4px 8px"
+          onclick="setTool('eraser')">
+          🧹 지우개
+        </button>
+        <input
+          type="color"
+          id="penColor"
+          value="#e1306c"
+          style="width: 28px; height: 24px; border: none"
+          onchange="updatePenColor()" />
+        <button
+          style="width: auto; padding: 4px 8px; background: #e74c3c"
+          onclick="clearDrawings()">
+          그림 지우기
+        </button>
+      </div>
+      <div id="canvasContainer">
+        <svg id="connectionsSvg"></svg>
+        <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
+      </div>
+    </div>
+
+    <!-- 메모 작성/수정 모달 -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
-        <h3>📝 메모 노드 편집</h3>
+        <h3>📝 메모/대본 작성</h3>
         <input type="hidden" id="editMemoId" />
-        <input type="hidden" id="isSticky" />
         <label>제목</label>
-        <input
-          type="text"
-          id="editTitle"
-          style="
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-          " />
+        <input type="text" id="editTitle" />
 
-        <!-- 4번 기능: 이미지 URL 입력 -->
-        <label>🖼️ 이미지/레퍼런스 URL (선택)</label>
-        <input
-          type="text"
-          id="editImageUrl"
-          placeholder="https://..."
-          style="
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            box-sizing: border-box;
-          " />
+        <label>카테고리 (#태그)</label>
+        <input type="text" id="editCategory" placeholder="예: #병맛, #챌린지" />
 
-        <label>대본 및 내용</label>
+        <label>상태</label>
+        <select id="editStatus">
+          <option value="아이디어">💡 아이디어</option>
+          <option value="대본작성">✍️ 대본작성</option>
+          <option value="촬영예정">🎥 촬영예정</option>
+          <option value="완료">✅ 완료</option>
+        </select>
+
+        <label>인스타 릴스 / 유튜브 URL (미리보기 지원)</label>
+        <input type="text" id="editVideoUrl" placeholder="https://..." />
+
+        <label>BGM 음원명 및 링크</label>
+        <div style="display: flex; gap: 5px">
+          <input type="text" id="editBgmTitle" placeholder="음원명" />
+          <input type="text" id="editBgmUrl" placeholder="링크 (URL)" />
+        </div>
+
+        <label>대본 (서식 편집 지원)</label>
         <div
           id="quillEditor"
-          style="height: 120px; background: #fff; margin-bottom: 10px"></div>
+          style="height: 120px; background: #fff; margin-top: 6px"></div>
+        <div id="scriptWarning" class="char-warning">
+          ⚠️ 한 줄에 20자가 넘는 구절이 있습니다! 릴스 자막 가독성이 떨어질 수
+          있습니다.
+        </div>
 
         <div style="display: flex; gap: 10px; margin-top: 15px">
-          <button
-            style="
-              flex: 1;
-              background: var(--primary);
-              color: #fff;
-              border: none;
-              padding: 8px;
-              border-radius: 6px;
-              font-weight: bold;
-              cursor: pointer;
-            "
-            onclick="saveMemoModal()">
-            저장하기
-          </button>
-          <button
-            style="
-              background: #666;
-              color: #fff;
-              border: none;
-              border-radius: 6px;
-              padding: 8px 15px;
-              cursor: pointer;
-            "
-            onclick="closeModal('memoModal')">
+          <button onclick="saveMemoModal()">저장하기</button>
+          <button style="background: #666" onclick="closeModal('memoModal')">
             취소
           </button>
         </div>
       </div>
     </div>
 
+    <!-- 9:16 미리보기 모달 -->
+    <div id="reelsModal" class="modal-bg">
+      <div class="modal" style="background: transparent; box-shadow: none">
+        <div class="reels-phone-frame">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 0.8rem;
+            ">
+            <span id="reelsPreviewTitle">릴스 미리보기</span>
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
+              >✕</span
+            >
+          </div>
+          <div
+            style="
+              text-align: center;
+              padding: 20px;
+              font-size: 1.1rem;
+              font-weight: bold;
+              background: rgba(0, 0, 0, 0.6);
+              border-radius: 10px;
+            "
+            id="reelsPreviewScript">
+            자막이 여기에 표시됩니다.
+          </div>
+          <div style="font-size: 0.8rem">
+            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 댓글 모달 -->
+    <div id="commentModal" class="modal-bg">
+      <div class="modal">
+        <h3>💬 아이디어 토론 댓글</h3>
+        <div
+          id="commentList"
+          style="
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+          "></div>
+        <textarea
+          id="newCommentText"
+          placeholder="댓글 입력 (@닉네임 으로 멘션 가능)"
+          rows="2"></textarea>
+        <button onclick="submitComment()">댓글 작성</button>
+        <button
+          style="background: #666; margin-top: 5px"
+          onclick="closeModal('commentModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 히스토리 모달 -->
+    <div id="historyModal" class="modal-bg">
+      <div class="modal">
+        <h3>📜 대본 변경 이력 (History)</h3>
+        <div id="historyList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('historyModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 휴지통 모달 -->
+    <div id="trashModal" class="modal-bg">
+      <div class="modal">
+        <h3>🗑️ 휴지통 (60일 보관)</h3>
+        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('trashModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 어드민 콘솔 -->
+    <div id="adminConsole">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h3 style="margin: 0">⚡ ADMIN CONSOLE</h3>
+        <span style="cursor: pointer" onclick="closeAdminConsole()">✕</span>
+      </div>
+      <p style="font-size: 0.8rem">신규 팀원 생성 및 활동 로그</p>
+      <input type="text" id="adminNewName" placeholder="닉네임" />
+      <input type="text" id="adminNewUsername" placeholder="아이디" />
+      <input type="password" id="adminNewPassword" placeholder="비밀번호" />
+      <select id="adminNewRole">
+        <option value="Member">Member</option>
+        <option value="Admin">Admin</option>
+        <option value="Viewer">Viewer</option>
+      </select>
+      <button onclick="addNewUser()">계정 추가하기</button>
+      <hr style="margin: 15px 0; border-color: #444" />
+      <button
+        style="background: #333; color: #00ff66"
+        onclick="loadAuditLogs()">
+        📜 활동 로그 조회
+      </button>
+      <div
+        id="auditLogBox"
+        style="
+          font-size: 0.75rem;
+          max-height: 120px;
+          overflow-y: auto;
+          margin-top: 8px;
+        "></div>
+    </div>
+
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
+      let selectedMemoForComment = null;
       let fCanvas = null;
       let quill = null;
+      let activeView = "kanban"; // 'kanban' 또는 'canvas'
       let memosCache = {};
-      let connections = [];
 
-      // 1번 기능: 줌 & 팬 상태값
-      let scale = 1;
-      let panX = 0,
-        panY = 0;
-      let isPanning = false;
-      let startX, startY;
-
-      let connectingFromId = null; // 1번 연결선 연결 대기 저장
+      function getEmbedUrl(url) {
+        if (!url) return null;
+        const ytMatch = url.match(
+          /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
+        );
+        if (ytMatch && ytMatch[1])
+          return `https://www.youtube.com/embed/${ytMatch[1]}`;
+        const instaMatch = url.match(
+          /instagram\.com\/(?:p|reel|reels)\/([^/?#&]+)/,
+        );
+        if (instaMatch && instaMatch[1])
+          return `https://www.instagram.com/p/${instaMatch[1]}/embed`;
+        return null;
+      }
 
       window.onload = () => {
+        quill = new Quill("#quillEditor", {
+          theme: "snow",
+          modules: {
+            toolbar: [["bold", "italic", "underline"], [{ color: [] }]],
+          },
+        });
+        quill.on("text-change", () => checkScriptWarning(quill.getText()));
+
         fCanvas = new fabric.Canvas("fabricCanvas", {
           isDrawingMode: false,
           selection: true,
@@ -464,79 +698,43 @@
         fCanvas.freeDrawingBrush.color =
           document.getElementById("penColor").value;
 
-        fCanvas.on("path:created", function (e) {
+        fCanvas.on("path:created", (e) => {
           socket.emit("drawing:path", {
             boardId: currentBoardId,
             svgPath: e.path.toSVG(),
           });
         });
 
-        // 1번 기능: 줌 & 팬 (Ctrl + 휠 줌, 스페이스바 / 마우스 드래그 팬)
-        const viewport = document.getElementById("canvasViewport");
-        viewport.addEventListener("wheel", (e) => {
-          if (e.ctrlKey) {
-            e.preventDefault();
-            scale += e.deltaY * -0.001;
-            scale = Math.min(Math.max(0.2, scale), 3);
-            updateTransform();
-          }
-        });
-
-        viewport.addEventListener("mousedown", (e) => {
-          if (
-            e.button === 1 ||
-            e.spaceKey ||
-            e.target.id === "canvasViewport"
-          ) {
-            isPanning = true;
-            startX = e.clientX - panX;
-            startY = e.clientY - panY;
-          }
-        });
-
-        window.addEventListener("mousemove", (e) => {
-          if (isPanning) {
-            panX = e.clientX - startX;
-            panY = e.clientY - startY;
-            updateTransform();
-          }
-        });
-
-        window.addEventListener("mouseup", () => {
-          isPanning = false;
-        });
-
         init();
       };
 
-      function updateTransform() {
-        const container = document.getElementById("canvasContainer");
-        container.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
-        updateMinimap();
+      async function init() {
+        const res = await fetch("/api/me");
+        const data = await res.json();
+        if (data.loggedIn) {
+          currentUser = data.user;
+          document.getElementById("loginView").style.display = "none";
+          switchView("kanban");
+          loadBoards();
+        }
       }
 
-      // 2번 기능: 미니맵 업데이트
-      function updateMinimap() {
-        const minimapVp = document.getElementById("minimapViewport");
-        const ratio = 160 / 6000;
-        minimapVp.style.width = `${(window.innerWidth / scale) * ratio}px`;
-        minimapVp.style.height = `${(window.innerHeight / scale) * ratio}px`;
-        minimapVp.style.left = `${Math.abs(panX) * ratio}px`;
-        minimapVp.style.top = `${Math.abs(panY) * ratio}px`;
+      function switchView(view) {
+        activeView = view;
+        if (view === "kanban") {
+          document.getElementById("kanbanView").style.display = "block";
+          document.getElementById("canvasView").style.display = "none";
+        } else {
+          document.getElementById("kanbanView").style.display = "none";
+          document.getElementById("canvasView").style.display = "block";
+        }
+        if (currentBoardId) loadMemos();
       }
 
       function setTool(tool) {
-        document
-          .querySelectorAll(".btn-tool")
-          .forEach((btn) => btn.classList.remove("active"));
         if (tool === "pen") {
-          document.getElementById("toolPenBtn").classList.add("active");
           fCanvas.isDrawingMode = true;
-        } else if (tool === "eraser") {
-          document.getElementById("toolEraserBtn").classList.add("active");
-          fCanvas.isDrawingMode = false;
         } else {
-          document.getElementById("toolSelectBtn").classList.add("active");
           fCanvas.isDrawingMode = false;
         }
       }
@@ -547,18 +745,13 @@
             document.getElementById("penColor").value;
       }
 
-      async function init() {
-        quill = new Quill("#quillEditor", {
-          theme: "snow",
-          modules: { toolbar: [["bold", "italic"]] },
-        });
-        const res = await fetch("/api/me");
-        const data = await res.json();
-        if (data.loggedIn) {
-          currentUser = data.user;
-          document.getElementById("loginView").style.display = "none";
-          loadBoards();
-        }
+      function clearDrawings() {
+        if (confirm("캔버스 손그림을 지우시겠습니까?"))
+          socket.emit("drawing:clear", currentBoardId);
+      }
+
+      function toggleDarkMode() {
+        document.body.classList.toggle("dark-mode");
       }
 
       async function login() {
@@ -578,106 +771,137 @@
         await fetch("/api/logout", { method: "POST" });
         location.reload();
       }
+      function toggleSidebar() {
+        document.getElementById("sidebar").classList.toggle("open");
+      }
+      function closeModal(id) {
+        document.getElementById(id).style.display = "none";
+      }
 
       async function loadBoards() {
         const res = await fetch("/api/boards");
         const boards = await res.json();
-        if (boards.length > 0) {
-          currentBoardId = boards[0].id;
-          socket.emit("board:join", currentBoardId);
-          loadMemos();
-          loadConnections();
-          loadDrawings();
-        }
-      }
+        const listEl = document.getElementById("boardList");
+        listEl.innerHTML = "";
 
-      async function loadMemos() {
-        const res = await fetch(`/api/memos/${currentBoardId}`);
-        const memos = await res.json();
-        renderCanvas(memos);
-      }
-
-      async function loadConnections() {
-        const res = await fetch(`/api/connections/${currentBoardId}`);
-        connections = await res.json();
-        renderConnections();
-      }
-
-      async function loadDrawings() {
-        const res = await fetch(`/api/drawings/${currentBoardId}`);
-        const drawings = await res.json();
-        fCanvas.clear();
-        drawings.forEach((d) => {
-          fabric.loadSVGFromString(d.path_data, function (objects, options) {
-            const obj = fabric.util.groupSVGElements(objects, options);
-            fCanvas.add(obj);
-            fCanvas.renderAll();
-          });
+        boards.forEach((board, idx) => {
+          const li = document.createElement("li");
+          li.innerText = board.name;
+          li.style.padding = "8px";
+          li.style.cursor = "pointer";
+          li.onclick = () => selectBoard(board);
+          if (idx === 0 && !currentBoardId) selectBoard(board);
+          listEl.appendChild(li);
         });
       }
 
-      // 렌더링 (3, 4, 5, 6, 8번 기능 융합)
+      function selectBoard(board) {
+        currentBoardId = board.id;
+        document.getElementById("currentBoardTitle").innerText = board.name;
+        socket.emit("board:join", board.id);
+        loadMemos();
+      }
+
+      async function loadMemos() {
+        if (!currentBoardId) return;
+        const res = await fetch(`/api/memos/${currentBoardId}`);
+        const memos = await res.json();
+        if (activeView === "kanban") renderKanban(memos);
+        else renderCanvas(memos);
+      }
+
+      function renderKanban(memos) {
+        ["아이디어", "대본작성", "촬영예정", "완료"].forEach((status) => {
+          document.getElementById(`col-${status}`).innerHTML = "";
+        });
+
+        memos.forEach((memo) => {
+          memosCache[memo.id] = memo;
+          const estSeconds = Math.ceil((memo.script || "").length / 6);
+          const colEl =
+            document.getElementById(`col-${memo.status}`) ||
+            document.getElementById("col-아이디어");
+          const embedUrl = getEmbedUrl(memo.video_url);
+
+          const card = document.createElement("div");
+          card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
+          card.draggable = currentUser.role !== "Viewer";
+          card.ondragstart = (e) =>
+            e.dataTransfer.setData("text/plain", memo.id);
+
+          card.innerHTML = `
+            ${memo.is_pinned ? '📌 <b style="color:var(--primary); font-size:0.75rem;">고정됨</b><br>' : ""}
+            <span class="badge">${memo.category || "일반"}</span>
+            <h4 style="margin:6px 0;">${memo.title}</h4>
+            <div class="script-box">${memo.rich_content || memo.script || "대본 없음"}</div>
+            <div style="font-size:0.75rem; color:#2b8a3e; margin-top:4px;">⏱️ 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
+            
+            ${
+              memo.video_url
+                ? `
+              <div class="video-preview-wrapper">
+                <div class="video-preview-btn">▶️ 영상 미리보기 (호버)</div>
+                <div class="video-preview-popup">
+                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:15px; font-size:0.8rem;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[링크 바로가기]</a></div>`}
+                </div>
+              </div>
+            `
+                : ""
+            }
+
+            <div style="display:flex; gap:4px; margin-top:8px;">
+              <button style="font-size:0.7rem; padding:2px 6px;" onclick="openReelsModal('${memo.title}', \`${memo.script}\`, '${memo.bgm_title}')">📱 9:16뷰어</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#4a90e2;" onclick="openCommentModal('${memo.id}')">💬 댓글</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#7f8c8d;" onclick="openHistoryModal('${memo.id}')">📜 히스토리</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.75rem; color:#888;">
+              <span>✍️ ${memo.author}</span>
+              <div>
+                <button style="width:auto; padding:2px 6px;" onclick="likeMemo('${memo.id}')">❤️ ${memo.likes || 0}</button>
+                <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          colEl.appendChild(card);
+        });
+      }
+
       function renderCanvas(memos) {
-        memosCache = {};
         const container = document.getElementById("canvasContainer");
-        const oldCards = container.querySelectorAll(".canvas-card");
-        oldCards.forEach((c) => c.remove());
+        container.querySelectorAll(".canvas-card").forEach((c) => c.remove());
 
         memos.forEach((memo, index) => {
           memosCache[memo.id] = memo;
           const card = document.createElement("div");
-          card.className = `canvas-card ${memo.category === "#포스트잇" ? "sticky-note" : ""} ${memo.is_locked ? "locked" : ""}`;
+          card.className = "canvas-card";
           card.id = `card-${memo.id}`;
-          card.dataset.id = memo.id;
-
-          card.style.left = `${memo.pos_x || 120 + (index % 4) * 340}px`;
-          card.style.top = `${memo.pos_y || 120 + Math.floor(index / 4) * 280}px`;
-          if (memo.width) card.style.width = `${memo.width}px`;
-          if (memo.height) card.style.height = `${memo.height}px`;
+          card.style.left = `${memo.pos_x || 100 + (index % 4) * 320}px`;
+          card.style.top = `${memo.pos_y || 100 + Math.floor(index / 4) * 260}px`;
 
           card.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.7rem; font-weight:bold;">${memo.category || "#노드"}</span>
-              <div>
-                <button style="font-size:0.6rem;" onclick="toggleLock('${memo.id}', ${!memo.is_locked})">${memo.is_locked ? "🔒" : "🔓"}</button>
-                <button style="font-size:0.6rem;" onclick="startConnection('${memo.id}')">🔗</button>
-              </div>
+              <span class="badge">${memo.category || "#아이디어"}</span>
+              <span style="font-size:0.7rem;">✍️ ${memo.author}</span>
             </div>
             <h4 style="margin:4px 0;">${memo.title}</h4>
-            ${memo.image_url ? `<img src="${memo.image_url}" style="width:100%; max-height:80px; object-fit:cover; border-radius:4px; margin-top:4px;">` : ""}
-            <div class="script-box">${memo.rich_content || memo.script || ""}</div>
-            <button style="font-size:0.65rem; margin-top:6px; background:#27ae60; color:#fff; border:none; padding:2px 6px; border-radius:4px; cursor:pointer;" onclick="editMemo('${memo.id}')">✏️ 편집</button>
+            <div class="script-box" style="max-height:80px;">${memo.rich_content || memo.script || ""}</div>
+            <button style="font-size:0.65rem; margin-top:6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 편집</button>
           `;
 
-          // 5번 기능: 크기 변경(Resize) 감지 이벤트
-          new ResizeObserver(() => {
-            socket.emit("memo:resize", {
-              memoId: memo.id,
-              boardId: currentBoardId,
-              width: card.offsetWidth,
-              height: card.offsetHeight,
-            });
-            renderConnections();
-          }).observe(card);
-
-          // 드래그 이동
-          let isCardDragging = false,
+          let isDragging = false,
             offsetLeft = 0,
             offsetTop = 0;
           card.addEventListener("mousedown", (e) => {
-            if (
-              memo.is_locked ||
-              e.target.tagName === "BUTTON" ||
-              fCanvas.isDrawingMode
-            )
-              return;
-            isCardDragging = true;
+            if (e.target.tagName === "BUTTON" || fCanvas.isDrawingMode) return;
+            isDragging = true;
             offsetLeft = e.clientX - card.offsetLeft;
             offsetTop = e.clientY - card.offsetTop;
           });
 
           window.addEventListener("mousemove", (e) => {
-            if (isCardDragging) {
+            if (isDragging) {
               const newX = e.clientX - offsetLeft;
               const newY = e.clientY - offsetTop;
               card.style.left = `${newX}px`;
@@ -688,92 +912,44 @@
                 pos_x: newX,
                 pos_y: newY,
               });
-              renderConnections();
             }
           });
 
           window.addEventListener("mouseup", () => {
-            isCardDragging = false;
+            isDragging = false;
           });
           container.appendChild(card);
         });
-
-        renderConnections();
       }
 
-      // 1번 기능: 화살표 연결선 SVG 그리기
-      function renderConnections() {
-        const svg = document.getElementById("connectionsSvg");
-        svg.innerHTML = "";
-        connections.forEach((conn) => {
-          const fromEl = document.getElementById(`card-${conn.from_memo_id}`);
-          const toEl = document.getElementById(`card-${conn.to_memo_id}`);
-          if (fromEl && toEl) {
-            const x1 = fromEl.offsetLeft + fromEl.offsetWidth / 2;
-            const y1 = fromEl.offsetTop + fromEl.offsetHeight / 2;
-            const x2 = toEl.offsetLeft + toEl.offsetWidth / 2;
-            const y2 = toEl.offsetTop + toEl.offsetHeight / 2;
-
-            const line = document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "line",
-            );
-            line.setAttribute("x1", x1);
-            line.setAttribute("y1", y1);
-            line.setAttribute("x2", x2);
-            line.setAttribute("y2", y2);
-            line.setAttribute("stroke", "#e1306c");
-            line.setAttribute("stroke-width", "3");
-            line.setAttribute("stroke-dasharray", "5,5");
-            svg.appendChild(line);
-          }
+      function allowDrop(ev) {
+        ev.preventDefault();
+      }
+      async function drop(ev, newStatus) {
+        ev.preventDefault();
+        const memoId = ev.dataTransfer.getData("text/plain");
+        if (!memoId) return;
+        await fetch("/api/memos/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memoId, status: newStatus }),
         });
       }
 
-      function startConnection(memoId) {
-        if (!connectingFromId) {
-          connectingFromId = memoId;
-          alert("연결할 대상 카드의 🔗 버튼을 눌러주세요.");
-        } else {
-          socket.emit("connection:create", {
-            boardId: currentBoardId,
-            fromId: connectingFromId,
-            toId: memoId,
-          });
-          connectingFromId = null;
-        }
+      function checkScriptWarning(text) {
+        const lines = text.split("\n");
+        const hasLongLine = lines.some((l) => l.length > 20);
+        document.getElementById("scriptWarning").style.display = hasLongLine
+          ? "block"
+          : "none";
       }
 
-      // 8번 기능: 잠금 토글
-      function toggleLock(memoId, is_locked) {
-        socket.emit("memo:lock", {
-          memoId,
-          boardId: currentBoardId,
-          is_locked,
-        });
-      }
-
-      // 10번 기능: 프롬프터 모드 실행
-      function startPrompter() {
-        const text = Object.values(memosCache)
-          .map((m) => `[${m.title}]\n${m.script}`)
-          .join("\n\n--------------------\n\n");
-        document.getElementById("prompterContent").innerText =
-          text || "작성된 대본이 없습니다.";
-        document.getElementById("prompterOverlay").style.display = "block";
-      }
-      function stopPrompter() {
-        document.getElementById("prompterOverlay").style.display = "none";
-      }
-
-      function openMemoModal(type) {
+      function openMemoEditModal() {
         document.getElementById("editMemoId").value = "";
-        document.getElementById("isSticky").value =
-          type === "sticky" ? "true" : "false";
-        document.getElementById("editTitle").value =
-          type === "sticky" ? "📌 스티커 아이디어" : "🎬 릴스 대본";
-        document.getElementById("editImageUrl").value = "";
-        quill.clipboard.dangerouslyPasteHTML("<p>내용을 작성하세요...</p>");
+        document.getElementById("editTitle").value = "";
+        document.getElementById("editCategory").value = "";
+        document.getElementById("editVideoUrl").value = "";
+        quill.clipboard.dangerouslyPasteHTML("[후킹]: \n[본문]: \n[CTA]: ");
         document.getElementById("memoModal").style.display = "flex";
       }
 
@@ -782,7 +958,10 @@
         if (!memo) return;
         document.getElementById("editMemoId").value = memo.id;
         document.getElementById("editTitle").value = memo.title;
-        document.getElementById("editImageUrl").value = memo.image_url || "";
+        document.getElementById("editCategory").value = memo.category || "";
+        document.getElementById("editVideoUrl").value = memo.video_url || "";
+        document.getElementById("editBgmTitle").value = memo.bgm_title || "";
+        document.getElementById("editBgmUrl").value = memo.bgm_url || "";
         quill.clipboard.dangerouslyPasteHTML(
           memo.rich_content || memo.script || "",
         );
@@ -791,46 +970,193 @@
 
       function saveMemoModal() {
         const id = document.getElementById("editMemoId").value;
-        const isSticky = document.getElementById("isSticky").value === "true";
-        socket.emit("memo:save", {
+        const memoData = {
           id: id || undefined,
           board_id: currentBoardId,
-          title: document.getElementById("editTitle").value || "무제 노드",
-          category: isSticky ? "#포스트잇" : "#릴스대본",
-          image_url: document.getElementById("editImageUrl").value,
+          title: document.getElementById("editTitle").value || "무제 아이디어",
+          category: document.getElementById("editCategory").value || "#일반",
+          status: document.getElementById("editStatus").value,
+          video_url: document.getElementById("editVideoUrl").value,
+          bgm_title: document.getElementById("editBgmTitle").value,
+          bgm_url: document.getElementById("editBgmUrl").value,
           rich_content: quill.root.innerHTML,
           script: quill.getText(),
-          pos_x: Math.floor(Math.random() * 300) + 100,
-          pos_y: Math.floor(Math.random() * 300) + 150,
           author: currentUser.name,
-        });
+        };
+
+        socket.emit("memo:save", memoData);
         closeModal("memoModal");
       }
 
-      function closeModal(id) {
-        document.getElementById(id).style.display = "none";
+      function openReelsModal(title, script, bgm) {
+        document.getElementById("reelsPreviewTitle").innerText = title;
+        document.getElementById("reelsPreviewScript").innerText =
+          script || "대본이 없습니다.";
+        document.getElementById("reelsPreviewBgm").innerText =
+          bgm || "기본 음원";
+        document.getElementById("reelsModal").style.display = "flex";
+      }
+
+      async function openCommentModal(memoId) {
+        selectedMemoForComment = memoId;
+        const res = await fetch(`/api/comments/${memoId}`);
+        const comments = await res.json();
+        const box = document.getElementById("commentList");
+        box.innerHTML = comments
+          .map(
+            (c) => `
+          <div style="font-size:0.8rem; margin-bottom:6px;">
+            <b>${c.author}:</b> ${c.content} <span style="color:#aaa; font-size:0.7rem;">(${new Date(c.created_at).toLocaleTimeString()})</span>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("commentModal").style.display = "flex";
+      }
+
+      function submitComment() {
+        const text = document.getElementById("newCommentText").value;
+        if (!text) return;
+        socket.emit("comment:add", {
+          memoId: selectedMemoForComment,
+          boardId: currentBoardId,
+          content: text,
+        });
+        document.getElementById("newCommentText").value = "";
+        closeModal("commentModal");
+      }
+
+      async function openHistoryModal(memoId) {
+        const res = await fetch(`/api/history/${memoId}`);
+        const logs = await res.json();
+        const box = document.getElementById("historyList");
+        box.innerHTML = logs
+          .map(
+            (l) => `
+          <div style="font-size:0.8rem; border-bottom:1px solid #ccc; padding:6px 0;">
+            <div>✍️ <b>${l.edited_by}</b> (${new Date(l.created_at).toLocaleString()})</div>
+            <pre style="background:#eee; padding:4px; font-size:0.75rem;">${l.script}</pre>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("historyModal").style.display = "flex";
+      }
+
+      async function toggleTrashModal() {
+        const res = await fetch(`/api/trash/${currentBoardId}`);
+        const trashMemos = await res.json();
+        const box = document.getElementById("trashList");
+        box.innerHTML = trashMemos
+          .map(
+            (t) => `
+          <div style="display:flex; justify-size:space-between; align-items:center; font-size:0.8rem; margin-bottom:6px;">
+            <span>${t.title} (삭제일: ${new Date(t.deleted_at).toLocaleDateString()})</span>
+            <button style="width:auto; padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("trashModal").style.display = "flex";
+      }
+
+      async function restoreMemo(memoId) {
+        await fetch("/api/memos/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memoId }),
+        });
+        closeModal("trashModal");
+        loadMemos();
+      }
+
+      function deleteMemo(memoId) {
+        if (confirm("이 메모를 휴지통으로 이동하시겠습니까? (60일 보관)")) {
+          socket.emit("memo:delete", { memoId, boardId: currentBoardId });
+        }
+      }
+
+      function likeMemo(memoId) {
+        socket.emit("memo:like", { memoId, boardId: currentBoardId });
+      }
+
+      async function exportTXT() {
+        const res = await fetch(`/api/memos/${currentBoardId}`);
+        const memos = await res.json();
+        let content = `🎬 [릴스 대본 집합]\n\n`;
+        memos.forEach((m, i) => {
+          content += `============== ${i + 1}. ${m.title} ==============\n상태: ${m.status}\n대본:\n${m.script}\n\n`;
+        });
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `reels_scripts_${Date.now()}.txt`;
+        a.click();
+      }
+
+      // 커맨드 감사 로그 및 소켓 바인딩
+      const secretSequence = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowUp",
+        "ArrowLeft",
+        "ArrowUp",
+        "ArrowRight",
+        "ArrowUp",
+      ];
+      let inputBuffer = [];
+      document.addEventListener("keydown", (e) => {
+        if (window.location.pathname !== "/admin") return;
+        inputBuffer.push(e.key);
+        if (inputBuffer.length > secretSequence.length) inputBuffer.shift();
+        if (JSON.stringify(inputBuffer) === JSON.stringify(secretSequence)) {
+          document.getElementById("adminConsole").style.display = "block";
+          inputBuffer = [];
+        }
+      });
+
+      function closeAdminConsole() {
+        document.getElementById("adminConsole").style.display = "none";
+      }
+
+      async function addNewUser() {
+        const name = document.getElementById("adminNewName").value;
+        const username = document.getElementById("adminNewUsername").value;
+        const password = document.getElementById("adminNewPassword").value;
+        const role = document.getElementById("adminNewRole").value;
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, username, password, role }),
+        });
+        const data = await res.json();
+        if (data.success) alert("계정이 생성되었습니다!");
+        else alert(data.message);
+      }
+
+      async function loadAuditLogs() {
+        const res = await fetch("/api/admin/logs");
+        const logs = await res.json();
+        document.getElementById("auditLogBox").innerHTML = logs
+          .map(
+            (l) =>
+              `<div>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}: ${l.action}</div>`,
+          )
+          .join("");
       }
 
       socket.on("presence:update", (users) => {
         document.getElementById("onlineCount").innerText =
           `접속자: ${users.length}명`;
       });
-
       socket.on("memo:updated", () => loadMemos());
-      socket.on("connection:created", (conn) => {
-        connections.push(conn);
-        renderConnections();
-      });
-      socket.on("memo:resized", () => renderConnections());
-      socket.on("memo:locked", () => loadMemos());
+      socket.on("memo:liked", () => loadMemos());
       socket.on("drawing:path", ({ svgPath }) => {
-        fabric.loadSVGFromString(svgPath, function (objects, options) {
+        fabric.loadSVGFromString(svgPath, (objects, options) => {
           fCanvas.add(fabric.util.groupSVGElements(objects, options));
           fCanvas.renderAll();
         });
       });
-
-      init();
     </script>
   </body>
 </html>
