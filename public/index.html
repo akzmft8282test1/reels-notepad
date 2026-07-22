@@ -2,11 +2,13 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🎨 피그마형 무한 릴스 대본 캔버스 Pro</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>🎨 피그마형 무한 릴스 대본 & 자유 그림 캔버스 Pro</title>
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Quill.js 서식 있는 텍스트 에디터 -->
+    <!-- Quill.js 서식 에디터 -->
     <link
       href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
       rel="stylesheet" />
@@ -17,7 +19,6 @@
         --primary: #e1306c;
         --bg: #f8f9fa;
         --card-bg: #ffffff;
-        --text: #333333;
         --border: #e0e0e0;
       }
 
@@ -28,9 +29,9 @@
         padding: 0;
         background: #e2e8f0;
         overflow: hidden;
+        touch-action: none;
       }
 
-      /* 상단 피그마 스타일 툴바 */
       header {
         position: fixed;
         top: 15px;
@@ -38,16 +39,16 @@
         transform: translateX(-50%);
         background: #ffffff;
         border: 1px solid #cbd5e1;
-        padding: 8px 24px;
+        padding: 6px 18px;
         border-radius: 30px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
         z-index: 1000;
+        flex-wrap: wrap;
       }
 
-      /* 거대한 무한 모눈격자 캔버스 */
       #canvas {
         width: 6000px;
         height: 6000px;
@@ -59,10 +60,17 @@
         left: 0;
       }
 
-      /* 캔버스 자율 배치 카드 */
+      #drawCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        cursor: crosshair;
+      }
+
       .canvas-card {
         position: absolute;
-        width: 320px;
+        width: 300px;
         background: var(--card-bg);
         border-radius: 12px;
         border: 2px solid #cbd5e1;
@@ -70,14 +78,7 @@
         padding: 16px;
         cursor: move;
         user-select: none;
-        transition:
-          border-color 0.2s,
-          box-shadow 0.2s;
-      }
-
-      .canvas-card:hover {
-        border-color: var(--primary);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+        z-index: 10;
       }
 
       .script-box {
@@ -87,11 +88,10 @@
         border: 1px solid #e2e8f0;
         font-size: 0.85rem;
         margin-top: 8px;
-        max-height: 160px;
+        max-height: 150px;
         overflow-y: auto;
       }
 
-      /* 타 유저 마우스 커서 */
       .user-cursor {
         position: absolute;
         pointer-events: none;
@@ -102,7 +102,6 @@
         border-radius: 12px;
         z-index: 9999;
         font-weight: bold;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
       }
 
       .modal-bg {
@@ -128,7 +127,7 @@
       input,
       button,
       select {
-        padding: 8px;
+        padding: 6px 10px;
         border-radius: 6px;
         border: 1px solid #ccc;
         box-sizing: border-box;
@@ -140,54 +139,44 @@
         font-weight: bold;
         cursor: pointer;
       }
-
-      #adminConsole {
-        display: none;
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 420px;
-        background: #1e1e1e;
-        color: #00ff66;
-        padding: 20px;
-        border-radius: 10px;
-        z-index: 3000;
-        font-family: monospace;
+      .draw-active {
+        background: #10b981 !important;
+        color: #fff !important;
       }
     </style>
   </head>
   <body>
     <header>
-      <div
-        style="
-          font-weight: bold;
-          color: var(--primary);
-          display: flex;
-          align-items: center;
-          gap: 6px;
-        ">
+      <div style="font-weight: bold; color: var(--primary)">
         🎨 릴스 캔버스 Pro
       </div>
+
+      <button
+        id="drawModeBtn"
+        onclick="toggleDrawMode()"
+        style="background: #f1f5f9; color: #333; font-weight: bold">
+        ✏️ 손그림 모드
+      </button>
+      <input
+        type="color"
+        id="penColor"
+        value="#e1306c"
+        style="width: 36px; height: 30px; padding: 0; cursor: pointer"
+        title="펜 색상" />
+      <button
+        style="background: #e74c3c; color: #fff"
+        onclick="clearDrawings()">
+        🧹 그림 지우기
+      </button>
+
       <button class="btn-primary" onclick="openMemoModal('hook')">
-        ⚡ 3초 후킹 노드
+        ⚡ 3초 후킹
       </button>
       <button
         class="btn-primary"
         style="background: #3b82f6"
         onclick="openMemoModal('story')">
-        📖 스토리 노드
-      </button>
-      <button
-        class="btn-primary"
-        style="background: #10b981"
-        onclick="openMemoModal('custom')">
-        + 자유 아이디어
-      </button>
-      <button
-        style="background: #64748b; color: #fff"
-        onclick="toggleTrashModal()">
-        🗑️ 휴지통
+        📖 스토리
       </button>
       <div
         id="onlineCount"
@@ -199,12 +188,11 @@
         ">
         접속자: 0명
       </div>
-      <button style="background: #e74c3c; color: #fff" onclick="logout()">
+      <button style="background: #64748b; color: #fff" onclick="logout()">
         로그아웃
       </button>
     </header>
 
-    <!-- 로그인 화면 -->
     <div
       id="loginView"
       style="
@@ -235,35 +223,32 @@
       </button>
     </div>
 
-    <!-- 무한 캔버스 -->
-    <div id="canvas"></div>
+    <div id="canvas">
+      <canvas id="drawCanvas" width="6000" height="6000"></canvas>
+    </div>
 
-    <!-- 작성 및 서식 편집 모달 -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
-        <h3>📝 캔버스 메모 노드 편집</h3>
+        <h3>📝 대본/아이디어 노드 편집</h3>
         <input type="hidden" id="editMemoId" />
         <label>제목</label>
         <input
           type="text"
           id="editTitle"
           style="width: 100%; margin-bottom: 10px" />
-
         <label>카테고리</label>
         <input
           type="text"
           id="editCategory"
           placeholder="#정보, #챌린지"
           style="width: 100%; margin-bottom: 10px" />
-
         <label>대본 서식 (볼드, 이탤릭, 색상 적용)</label>
         <div
           id="quillEditor"
           style="height: 150px; background: #fff; margin-bottom: 10px"></div>
-
         <div style="display: flex; gap: 10px; margin-top: 15px">
           <button class="btn-primary" style="flex: 1" onclick="saveMemoModal()">
-            캔버스에 저장
+            저장하기
           </button>
           <button
             style="
@@ -281,100 +266,131 @@
       </div>
     </div>
 
-    <!-- 댓글 모달 -->
-    <div id="commentModal" class="modal-bg">
-      <div class="modal">
-        <h3>💬 아이디어 토론 댓글</h3>
-        <div
-          id="commentList"
-          style="
-            max-height: 200px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            padding: 8px;
-            border-radius: 6px;
-          "></div>
-        <textarea
-          id="newCommentText"
-          placeholder="댓글 입력 (@닉네임 으로 멘션 가능)"
-          rows="2"
-          style="width: 100%"></textarea>
-        <button class="btn-primary" onclick="submitComment()">댓글 작성</button>
-        <button
-          style="background: #666; color: #fff; margin-top: 5px; width: 100%"
-          onclick="closeModal('commentModal')">
-          닫기
-        </button>
-      </div>
-    </div>
-
-    <!-- 휴지통 모달 -->
-    <div id="trashModal" class="modal-bg">
-      <div class="modal">
-        <h3>🗑️ 휴지통 (60일간 보관)</h3>
-        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
-        <button
-          style="background: #666; color: #fff; margin-top: 10px; width: 100%"
-          onclick="closeModal('trashModal')">
-          닫기
-        </button>
-      </div>
-    </div>
-
-    <!-- 어드민 콘솔 -->
-    <div id="adminConsole">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        ">
-        <h3 style="margin: 0">⚡ ADMIN CONSOLE</h3>
-        <span style="cursor: pointer" onclick="closeAdminConsole()">✕</span>
-      </div>
-      <p style="font-size: 0.8rem">신규 팀원 생성 및 접속 로그 확인</p>
-      <input
-        type="text"
-        id="adminNewName"
-        placeholder="닉네임"
-        style="width: 100%; margin-bottom: 5px" />
-      <input
-        type="text"
-        id="adminNewUsername"
-        placeholder="아이디"
-        style="width: 100%; margin-bottom: 5px" />
-      <input
-        type="password"
-        id="adminNewPassword"
-        placeholder="비밀번호"
-        style="width: 100%; margin-bottom: 5px" />
-      <select id="adminNewRole" style="width: 100%; margin-bottom: 10px">
-        <option value="Member">Member (수정/생성 가능)</option>
-        <option value="Admin">Admin (관리자)</option>
-        <option value="Viewer">Viewer (읽기 전용)</option>
-      </select>
-      <button class="btn-primary" style="width: 100%" onclick="addNewUser()">
-        계정 추가하기
-      </button>
-    </div>
-
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
       let quill = null;
       let memosCache = {};
-      let selectedMemoForComment = null;
-      let isDragging = false;
+
+      let isDraggingCard = false;
       let dragTarget = null;
       let dragOffset = { x: 0, y: 0 };
 
-      // 피그마 실시간 마우스 위치 및 드래그 제어
+      let isDrawMode = false;
+      let isDrawing = false;
+      let drawCanvas, ctx;
+      let currentStroke = [];
+
+      window.onload = () => {
+        drawCanvas = document.getElementById("drawCanvas");
+        ctx = drawCanvas.getContext("2d");
+
+        drawCanvas.addEventListener("mousedown", startDrawing);
+        drawCanvas.addEventListener("mousemove", draw);
+        drawCanvas.addEventListener("mouseup", stopDrawing);
+
+        drawCanvas.addEventListener("touchstart", (e) =>
+          startDrawing(e.touches[0]),
+        );
+        drawCanvas.addEventListener("touchmove", (e) => draw(e.touches[0]));
+        drawCanvas.addEventListener("touchend", stopDrawing);
+
+        init();
+      };
+
+      function toggleDrawMode() {
+        isDrawMode = !isDrawMode;
+        const btn = document.getElementById("drawModeBtn");
+        if (isDrawMode) {
+          btn.classList.add("draw-active");
+          btn.innerText = "✍️ 그리기 중 (클릭 시 해제)";
+          drawCanvas.style.pointerEvents = "auto";
+        } else {
+          btn.classList.remove("draw-active");
+          btn.innerText = "✏️ 손그림 모드";
+          drawCanvas.style.pointerEvents = "none";
+        }
+      }
+
+      function startDrawing(e) {
+        if (!isDrawMode) return;
+        isDrawing = true;
+        currentStroke = [];
+        const pos = getCanvasPos(e);
+        currentStroke.push(pos);
+
+        ctx.beginPath();
+        ctx.strokeStyle = document.getElementById("penColor").value;
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        ctx.moveTo(pos.x, pos.y);
+      }
+
+      function draw(e) {
+        if (!isDrawing || !isDrawMode) return;
+        const pos = getCanvasPos(e);
+        currentStroke.push(pos);
+
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+      }
+
+      function stopDrawing() {
+        if (!isDrawing) return;
+        isDrawing = false;
+        ctx.closePath();
+
+        if (currentStroke.length > 1) {
+          socket.emit("drawing:stroke", {
+            boardId: currentBoardId,
+            points: currentStroke,
+            color: document.getElementById("penColor").value,
+            width: 3,
+          });
+        }
+      }
+
+      function getCanvasPos(e) {
+        const rect = drawCanvas.getBoundingClientRect();
+        return {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+      }
+
+      function renderStroke(points, color, width) {
+        if (!points || points.length < 2) return;
+        ctx.beginPath();
+        ctx.strokeStyle = color || "#e1306c";
+        ctx.lineWidth = width || 3;
+        ctx.lineCap = "round";
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.stroke();
+        ctx.closePath();
+      }
+
+      function clearDrawings() {
+        if (confirm("캔버스의 모든 그림을 지우시겠습니까?")) {
+          socket.emit("drawing:clear", currentBoardId);
+        }
+      }
+
+      socket.on("drawing:stroke", (data) => {
+        renderStroke(data.points, data.color, data.width);
+      });
+
+      socket.on("drawing:cleared", () => {
+        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+      });
+
       document.addEventListener("mousemove", (e) => {
         socket.emit("cursor:move", { x: e.clientX, y: e.clientY });
 
-        if (isDragging && dragTarget) {
+        if (isDraggingCard && dragTarget) {
           const newX = e.clientX - dragOffset.x;
           const newY = e.clientY - dragOffset.y;
 
@@ -391,7 +407,7 @@
       });
 
       document.addEventListener("mouseup", () => {
-        isDragging = false;
+        isDraggingCard = false;
         dragTarget = null;
       });
 
@@ -466,6 +482,7 @@
           currentBoardId = boards[0].id;
           socket.emit("board:join", currentBoardId);
           loadMemos();
+          loadDrawings();
         }
       }
 
@@ -475,11 +492,24 @@
         renderCanvas(memos);
       }
 
-      // 🎯 피그마 무한 캔버스 렌더링
+      async function loadDrawings() {
+        const res = await fetch(`/api/drawings/${currentBoardId}`);
+        const drawings = await res.json();
+        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        drawings.forEach((d) => {
+          try {
+            const points = JSON.parse(d.path_data);
+            renderStroke(points, d.color, d.width);
+          } catch (e) {}
+        });
+      }
+
       function renderCanvas(memos) {
         memosCache = {};
         const canvas = document.getElementById("canvas");
-        canvas.innerHTML = "";
+
+        const oldCards = canvas.querySelectorAll(".canvas-card");
+        oldCards.forEach((c) => c.remove());
 
         memos.forEach((memo, index) => {
           memosCache[memo.id] = memo;
@@ -503,16 +533,14 @@
             <div class="script-box">${memo.rich_content || memo.script || "내용 없음"}</div>
 
             <div style="display:flex; gap:4px; margin-top:10px;">
-              <button style="font-size:0.7rem; padding:2px 6px; background:#4a90e2;" onclick="openCommentModal('${memo.id}')">💬 댓글</button>
               <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
               <button style="font-size:0.7rem; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
             </div>
           `;
 
           card.addEventListener("mousedown", (e) => {
-            if (e.target.tagName === "BUTTON" || e.target.tagName === "A")
-              return;
-            isDragging = true;
+            if (isDrawMode || e.target.tagName === "BUTTON") return;
+            isDraggingCard = true;
             dragTarget = card;
             dragOffset.x = e.clientX - card.offsetLeft;
             dragOffset.y = e.clientY - card.offsetTop;
@@ -567,111 +595,14 @@
         closeModal("memoModal");
       }
 
-      async function openCommentModal(memoId) {
-        selectedMemoForComment = memoId;
-        const res = await fetch(`/api/comments/${memoId}`);
-        const comments = await res.json();
-        const box = document.getElementById("commentList");
-        box.innerHTML = comments
-          .map(
-            (c) => `
-          <div style="font-size:0.8rem; margin-bottom:6px;">
-            <b>${c.author}:</b> ${c.content}
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("commentModal").style.display = "flex";
-      }
-
-      function submitComment() {
-        const text = document.getElementById("newCommentText").value;
-        if (!text) return;
-        socket.emit("comment:add", {
-          memoId: selectedMemoForComment,
-          boardId: currentBoardId,
-          content: text,
-        });
-        document.getElementById("newCommentText").value = "";
-        closeModal("commentModal");
-      }
-
-      async function toggleTrashModal() {
-        const res = await fetch(`/api/trash/${currentBoardId}`);
-        const trashMemos = await res.json();
-        const box = document.getElementById("trashList");
-        box.innerHTML = trashMemos
-          .map(
-            (t) => `
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-bottom:6px;">
-            <span>${t.title}</span>
-            <button style="width:auto; padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button>
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("trashModal").style.display = "flex";
-      }
-
-      async function restoreMemo(memoId) {
-        await fetch("/api/memos/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memoId }),
-        });
-        closeModal("trashModal");
-        loadMemos();
-      }
-
       function deleteMemo(memoId) {
-        if (confirm("이 메모를 휴지통으로 이동하시겠습니까?")) {
+        if (confirm("이 메모를 삭제하시겠습니까?")) {
           socket.emit("memo:delete", { memoId, boardId: currentBoardId });
         }
       }
 
       function closeModal(id) {
         document.getElementById(id).style.display = "none";
-      }
-
-      const secretSequence = [
-        "ArrowUp",
-        "ArrowDown",
-        "ArrowUp",
-        "ArrowLeft",
-        "ArrowUp",
-        "ArrowRight",
-        "ArrowUp",
-      ];
-      let inputBuffer = [];
-
-      document.addEventListener("keydown", (e) => {
-        if (window.location.pathname !== "/admin") return;
-        inputBuffer.push(e.key);
-        if (inputBuffer.length > secretSequence.length) inputBuffer.shift();
-        if (JSON.stringify(inputBuffer) === JSON.stringify(secretSequence)) {
-          document.getElementById("adminConsole").style.display = "block";
-          inputBuffer = [];
-        }
-      });
-
-      function closeAdminConsole() {
-        document.getElementById("adminConsole").style.display = "none";
-      }
-
-      async function addNewUser() {
-        const name = document.getElementById("adminNewName").value;
-        const username = document.getElementById("adminNewUsername").value;
-        const password = document.getElementById("adminNewPassword").value;
-        const role = document.getElementById("adminNewRole").value;
-
-        const res = await fetch("/api/admin/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, username, password, role }),
-        });
-        const data = await res.json();
-        if (data.success) alert("계정이 생성되었습니다!");
-        else alert(data.message);
       }
 
       socket.on("presence:update", (users) => {
