@@ -30,18 +30,11 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 io.engine.use(sessionMiddleware);
 
-async function logAction(username, action, details) {
-  try {
-    await supabase.from("audit_logs").insert([{ username, action, details }]);
-  } catch (e) {
-    console.error("Log error:", e);
-  }
-}
-
 app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// 로그인 API
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   const { data: user, error } = await supabase
@@ -71,34 +64,7 @@ app.post("/api/login", async (req, res) => {
     name: user.name,
     role: user.role || "Member",
   };
-  await logAction(user.username, "LOGIN", "로그인 성공");
   res.json({ success: true, user: req.session.user });
-});
-
-app.post("/api/admin/users", async (req, res) => {
-  const { name, username, password, role } = req.body;
-  if (!name || !username || !password)
-    return res
-      .status(400)
-      .json({ success: false, message: "모든 항목을 입력해주세요." });
-
-  try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const { data, error } = await supabase
-      .from("allowed_users")
-      .insert([
-        { name, username, password: hashedPassword, role: role || "Member" },
-      ])
-      .select();
-
-    if (error)
-      return res.status(500).json({ success: false, message: error.message });
-    res.json({ success: true, user: data[0] });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "서버 오류가 발생했습니다." });
-  }
 });
 
 app.get("/api/me", (req, res) => {
@@ -132,7 +98,7 @@ app.get("/api/memos/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// 기존 드로잉 데이터 불러오기
+// 드로잉 데이터 조회 (Fabric.js SVG 기반)
 app.get("/api/drawings/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -143,48 +109,32 @@ app.get("/api/drawings/:boardId", async (req, res) => {
   res.json(data);
 });
 
-app.get("/api/trash/:boardId", async (req, res) => {
+// 음성 채널 목록 조회
+app.get("/api/voice-channels/:boardId", async (req, res) => {
   const { boardId } = req.params;
-  const sixtyDaysAgo = new Date(
-    Date.now() - 60 * 24 * 60 * 60 * 1000,
-  ).toISOString();
   const { data, error } = await supabase
-    .from("memos")
+    .from("voice_channels")
     .select("*")
-    .eq("board_id", boardId)
-    .eq("is_deleted", true)
-    .gte("deleted_at", sixtyDaysAgo);
+    .eq("board_id", boardId);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
 });
 
-app.post("/api/memos/restore", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
-    return res.status(403).json({ message: "권한이 없습니다." });
-  const { memoId } = req.body;
+// 음성 채널 생성
+app.post("/api/voice-channels", async (req, res) => {
+  const { board_id, name, max_users } = req.body;
   const { data, error } = await supabase
-    .from("memos")
-    .update({ is_deleted: false, deleted_at: null })
-    .eq("id", memoId)
+    .from("voice_channels")
+    .insert([{ board_id, name, max_users: parseInt(max_users) || 4 }])
     .select();
   if (error) return res.status(500).json({ error: error.message });
-  io.to(data[0].board_id).emit("memo:updated", data[0]);
-  res.json({ success: true });
+  io.to(board_id).emit("voice:channel_created", data[0]);
+  res.json(data[0]);
 });
 
-app.get("/api/comments/:memoId", async (req, res) => {
-  const { memoId } = req.params;
-  const { data, error } = await supabase
-    .from("comments")
-    .select("*")
-    .eq("memo_id", memoId)
-    .order("created_at", { ascending: true });
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-// --- Socket.io 실시간 통신 ---
+// --- Socket.io 실시간 협업 & WebRTC 음성 연결 ---
 const activeUsers = new Map();
+const voiceRooms = new Map(); // roomId -> Set of socketIds
 
 io.on("connection", (socket) => {
   const req = socket.request;
@@ -221,18 +171,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 손글씨/그림 드로잉 실시간 방송 및 DB 저장
-  socket.on("drawing:stroke", async (strokeData) => {
+  // ⚡ Fabric.js 기반 렉 없는 SVG 드로잉 동기화
+  socket.on("drawing:path", async ({ boardId, svgPath }) => {
     if (user?.role === "Viewer") return;
-
-    socket.to(strokeData.boardId).emit("drawing:stroke", strokeData);
+    socket.to(boardId).emit("drawing:path", { svgPath });
 
     await supabase.from("canvas_drawings").insert([
       {
-        board_id: strokeData.boardId,
-        path_data: JSON.stringify(strokeData.points),
-        color: strokeData.color,
-        width: strokeData.width,
+        board_id: boardId,
+        path_data: svgPath,
         author: user?.name,
       },
     ]);
@@ -273,34 +220,69 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("memo:delete", async ({ memoId, boardId }) => {
-    if (user?.role === "Viewer") return;
-    await supabase
-      .from("memos")
-      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-      .eq("id", memoId);
-    io.to(boardId).emit("memo:updated", { id: memoId, is_deleted: true });
+  // 🎙️ 디스코드형 음성 채널 WebRTC 시그널링
+  socket.on("voice:join", ({ roomId, maxUsers }) => {
+    if (!voiceRooms.has(roomId)) {
+      voiceRooms.set(roomId, new Map());
+    }
+
+    const room = voiceRooms.get(roomId);
+    if (room.size >= maxUsers) {
+      socket.emit("voice:full");
+      return;
+    }
+
+    room.set(socket.id, user?.name || "익명");
+    socket.join(`voice-${roomId}`);
+
+    const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
+      id,
+      name,
+    }));
+    io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
   });
 
-  socket.on("comment:add", async ({ memoId, boardId, content }) => {
-    if (!content || user?.role === "Viewer") return;
-    const { data: comment } = await supabase
-      .from("comments")
-      .insert([{ memo_id: memoId, author: user?.name || "익명", content }])
-      .select();
-    if (comment) {
-      io.to(boardId).emit("comment:added", { memoId, comment: comment[0] });
+  socket.on("voice:signal", ({ targetId, signal }) => {
+    io.to(targetId).emit("voice:signal", { senderId: socket.id, signal });
+  });
+
+  socket.on("voice:leave", ({ roomId }) => {
+    if (voiceRooms.has(roomId)) {
+      const room = voiceRooms.get(roomId);
+      room.delete(socket.id);
+      socket.leave(`voice-${roomId}`);
+
+      const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
+        id,
+        name,
+      }));
+      io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
     }
   });
 
   socket.on("disconnect", () => {
     io.emit("cursor:remove", socket.id);
     activeUsers.delete(socket.id);
+
+    // 음성 방 퇴장 처리
+    voiceRooms.forEach((room, roomId) => {
+      if (room.has(socket.id)) {
+        room.delete(socket.id);
+        const usersInRoom = Array.from(room.entries()).map(([id, name]) => ({
+          id,
+          name,
+        }));
+        io.to(`voice-${roomId}`).emit("voice:users", usersInRoom);
+      }
+    });
+
     io.emit("presence:update", Array.from(activeUsers.values()));
   });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎬 자유 드로잉 피그마 캔버스 실행 중: http://localhost:${PORT}`);
+  console.log(
+    `🎬 렉 최적화 Fabric.js & 음성 피그마 캔버스: http://localhost:${PORT}`,
+  );
 });

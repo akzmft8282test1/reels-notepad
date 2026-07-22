@@ -5,7 +5,7 @@
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>🎨 피그마형 무한 릴스 대본 & 자유 그림 캔버스 Pro</title>
+    <title>🎨 피그마 캔버스 Pro (Fabric.js 드로잉 & 디스코드 음성)</title>
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- Quill.js 서식 에디터 -->
@@ -14,12 +14,15 @@
       rel="stylesheet" />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
+    <!-- ⚡ 렉 완벽 해결을 위한 초고속 Fabric.js 캔버스 패키지 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
     <style>
       :root {
         --primary: #e1306c;
         --bg: #f8f9fa;
         --card-bg: #ffffff;
-        --border: #e0e0e0;
+        --border: #cbd5e1;
       }
 
       body {
@@ -32,21 +35,29 @@
         touch-action: none;
       }
 
+      /* 헤더 피그마 스타일 툴바 */
       header {
         position: fixed;
         top: 15px;
         left: 50%;
         transform: translateX(-50%);
         background: #ffffff;
-        border: 1px solid #cbd5e1;
-        padding: 6px 18px;
+        border: 1px solid var(--border);
+        padding: 6px 16px;
         border-radius: 30px;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
         z-index: 1000;
-        flex-wrap: wrap;
+      }
+
+      /* 무한 캔버스 메인 레이어 */
+      #canvasViewport {
+        width: 100vw;
+        height: 100vh;
+        overflow: auto;
+        position: relative;
       }
 
       #canvas {
@@ -60,20 +71,21 @@
         left: 0;
       }
 
-      #drawCanvas {
-        position: absolute;
+      /* Fabric.js 캔버스 Wrapper 위치 지정 */
+      .canvas-container {
+        position: absolute !important;
         top: 0;
         left: 0;
         z-index: 1;
-        cursor: crosshair;
       }
 
+      /* 캔버스 메모 카드 */
       .canvas-card {
         position: absolute;
         width: 300px;
         background: var(--card-bg);
         border-radius: 12px;
-        border: 2px solid #cbd5e1;
+        border: 2px solid var(--border);
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         padding: 16px;
         cursor: move;
@@ -83,12 +95,11 @@
 
       .script-box {
         background: #f1f5f9;
-        padding: 10px;
+        padding: 8px;
         border-radius: 6px;
-        border: 1px solid #e2e8f0;
         font-size: 0.85rem;
         margin-top: 8px;
-        max-height: 150px;
+        max-height: 140px;
         overflow-y: auto;
       }
 
@@ -102,6 +113,34 @@
         border-radius: 12px;
         z-index: 9999;
         font-weight: bold;
+      }
+
+      /* 디스코드 스타일 음성 위젯 */
+      #voiceWidget {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        background: #1e1e2e;
+        color: #fff;
+        padding: 14px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        z-index: 1000;
+        width: 240px;
+      }
+
+      .btn-tool {
+        padding: 6px 12px;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+        background: #fff;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .btn-tool.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
       }
 
       .modal-bg {
@@ -121,78 +160,94 @@
         padding: 20px;
         border-radius: 12px;
         width: 90%;
-        max-width: 580px;
-      }
-
-      input,
-      button,
-      select {
-        padding: 6px 10px;
-        border-radius: 6px;
-        border: 1px solid #ccc;
-        box-sizing: border-box;
-      }
-      button.btn-primary {
-        background: var(--primary);
-        color: white;
-        border: none;
-        font-weight: bold;
-        cursor: pointer;
-      }
-      .draw-active {
-        background: #10b981 !important;
-        color: #fff !important;
+        max-width: 500px;
       }
     </style>
   </head>
   <body>
     <header>
-      <div style="font-weight: bold; color: var(--primary)">
+      <div style="font-weight: bold; color: var(--primary); font-size: 0.95rem">
         🎨 릴스 캔버스 Pro
       </div>
 
+      <!-- 도구 바 (펜 / 지우개 / 이동) -->
       <button
-        id="drawModeBtn"
-        onclick="toggleDrawMode()"
-        style="background: #f1f5f9; color: #333; font-weight: bold">
-        ✏️ 손그림 모드
+        id="toolSelectBtn"
+        class="btn-tool active"
+        onclick="setTool('select')">
+        🖐️ 이동
       </button>
+      <button id="toolPenBtn" class="btn-tool" onclick="setTool('pen')">
+        ✏️ 펜
+      </button>
+      <button id="toolEraserBtn" class="btn-tool" onclick="setTool('eraser')">
+        🧹 지우개
+      </button>
+
       <input
         type="color"
         id="penColor"
         value="#e1306c"
-        style="width: 36px; height: 30px; padding: 0; cursor: pointer"
-        title="펜 색상" />
+        style="
+          width: 32px;
+          height: 28px;
+          padding: 0;
+          border: none;
+          cursor: pointer;
+        "
+        onchange="updatePenColor()" />
+
       <button
-        style="background: #e74c3c; color: #fff"
+        style="
+          background: #e74c3c;
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          cursor: pointer;
+        "
         onclick="clearDrawings()">
-        🧹 그림 지우기
+        전체 지우기
+      </button>
+      <button
+        style="
+          background: var(--primary);
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          font-weight: bold;
+          cursor: pointer;
+        "
+        onclick="openMemoModal('hook')">
+        + 메모 생성
       </button>
 
-      <button class="btn-primary" onclick="openMemoModal('hook')">
-        ⚡ 3초 후킹
-      </button>
-      <button
-        class="btn-primary"
-        style="background: #3b82f6"
-        onclick="openMemoModal('story')">
-        📖 스토리
-      </button>
       <div
         id="onlineCount"
         style="
-          font-size: 0.85rem;
+          font-size: 0.8rem;
           background: #f1f5f9;
-          padding: 4px 10px;
+          padding: 4px 8px;
           border-radius: 12px;
         ">
         접속자: 0명
       </div>
-      <button style="background: #64748b; color: #fff" onclick="logout()">
+      <button
+        style="
+          background: #64748b;
+          color: #fff;
+          border: none;
+          border-radius: 6px;
+          padding: 6px 10px;
+          cursor: pointer;
+        "
+        onclick="logout()">
         로그아웃
       </button>
     </header>
 
+    <!-- 로그인 창 -->
     <div
       id="loginView"
       style="
@@ -212,42 +267,119 @@
         type="text"
         id="username"
         placeholder="아이디"
-        style="width: 100%; margin-bottom: 10px" /><br />
+        style="
+          width: 100%;
+          padding: 8px;
+          margin-bottom: 10px;
+          box-sizing: border-box;
+        " /><br />
       <input
         type="password"
         id="password"
         placeholder="비밀번호"
-        style="width: 100%; margin-bottom: 10px" /><br />
-      <button class="btn-primary" style="width: 100%" onclick="login()">
+        style="
+          width: 100%;
+          padding: 8px;
+          margin-bottom: 10px;
+          box-sizing: border-box;
+        " /><br />
+      <button
+        style="
+          width: 100%;
+          background: var(--primary);
+          color: #fff;
+          padding: 10px;
+          border: none;
+          border-radius: 6px;
+          font-weight: bold;
+          cursor: pointer;
+        "
+        onclick="login()">
         접속하기
       </button>
     </div>
 
-    <div id="canvas">
-      <canvas id="drawCanvas" width="6000" height="6000"></canvas>
+    <!-- 무한 캔버스 뷰포트 -->
+    <div id="canvasViewport">
+      <div id="canvas">
+        <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
+      </div>
     </div>
 
+    <!-- 🎙️ 디스코드 스타일 멀티 음성 채널 위젯 (8번 기능) -->
+    <div id="voiceWidget">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        ">
+        <span style="font-weight: bold; font-size: 0.85rem; color: #a6adc8"
+          >🎙️ 음성 협업 채널</span
+        >
+        <button
+          style="
+            font-size: 0.7rem;
+            background: #313244;
+            color: #cdd6f4;
+            border: none;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+          "
+          onclick="openVoiceCreateModal()">
+          + 방생성
+        </button>
+      </div>
+      <div id="voiceChannelList" style="font-size: 0.8rem">
+        음성 채널 로딩 중...
+      </div>
+    </div>
+
+    <!-- 메모 편집 모달 -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
-        <h3>📝 대본/아이디어 노드 편집</h3>
+        <h3>📝 대본/아이디어 메모 편집</h3>
         <input type="hidden" id="editMemoId" />
         <label>제목</label>
         <input
           type="text"
           id="editTitle"
-          style="width: 100%; margin-bottom: 10px" />
+          style="
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+          " />
         <label>카테고리</label>
         <input
           type="text"
           id="editCategory"
           placeholder="#정보, #챌린지"
-          style="width: 100%; margin-bottom: 10px" />
-        <label>대본 서식 (볼드, 이탤릭, 색상 적용)</label>
+          style="
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+          " />
+        <label>대본 서식 편집</label>
         <div
           id="quillEditor"
-          style="height: 150px; background: #fff; margin-bottom: 10px"></div>
+          style="height: 140px; background: #fff; margin-bottom: 10px"></div>
         <div style="display: flex; gap: 10px; margin-top: 15px">
-          <button class="btn-primary" style="flex: 1" onclick="saveMemoModal()">
+          <button
+            style="
+              flex: 1;
+              background: var(--primary);
+              color: #fff;
+              border: none;
+              padding: 8px;
+              border-radius: 6px;
+              font-weight: bold;
+              cursor: pointer;
+            "
+            onclick="saveMemoModal()">
             저장하기
           </button>
           <button
@@ -266,127 +398,142 @@
       </div>
     </div>
 
+    <!-- 음성방 생성 모달 -->
+    <div id="voiceModal" class="modal-bg">
+      <div class="modal">
+        <h3>🎙️ 음성 채널 생성 (인원 제한)</h3>
+        <label>방 이름</label>
+        <input
+          type="text"
+          id="voiceRoomName"
+          placeholder="예: 대본 회의실 1"
+          style="
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+          " />
+        <label>최대 인원 제한</label>
+        <select
+          id="voiceMaxUsers"
+          style="
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+          ">
+          <option value="2">2명 (1:1 회의)</option>
+          <option value="4" selected>4명 (팀 회의)</option>
+          <option value="8">8명 (전체 회의)</option>
+        </select>
+        <button
+          style="
+            width: 100%;
+            background: #313244;
+            color: #00ff66;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+          "
+          onclick="createVoiceChannel()">
+          채널 만들기
+        </button>
+      </div>
+    </div>
+
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
+      let fCanvas = null; // Fabric.js 인스턴스
       let quill = null;
       let memosCache = {};
 
       let isDraggingCard = false;
       let dragTarget = null;
       let dragOffset = { x: 0, y: 0 };
-
-      let isDrawMode = false;
-      let isDrawing = false;
-      let drawCanvas, ctx;
-      let currentStroke = [];
+      let activeVoiceRoomId = null;
 
       window.onload = () => {
-        drawCanvas = document.getElementById("drawCanvas");
-        ctx = drawCanvas.getContext("2d");
+        // ⚡ Fabric.js 초고속 패키지 기반 캔버스 초기화 (렉 제거)
+        fCanvas = new fabric.Canvas("fabricCanvas", {
+          isDrawingMode: false,
+          selection: true,
+        });
 
-        drawCanvas.addEventListener("mousedown", startDrawing);
-        drawCanvas.addEventListener("mousemove", draw);
-        drawCanvas.addEventListener("mouseup", stopDrawing);
+        fCanvas.freeDrawingBrush.width = 3;
+        fCanvas.freeDrawingBrush.color =
+          document.getElementById("penColor").value;
 
-        drawCanvas.addEventListener("touchstart", (e) =>
-          startDrawing(e.touches[0]),
-        );
-        drawCanvas.addEventListener("touchmove", (e) => draw(e.touches[0]));
-        drawCanvas.addEventListener("touchend", stopDrawing);
+        // 드로잉 완성 시 SVG 변환 후 가볍게 브로드캐스트
+        fCanvas.on("path:created", function (e) {
+          const pathSvg = e.path.toSVG();
+          socket.emit("drawing:path", {
+            boardId: currentBoardId,
+            svgPath: pathSvg,
+          });
+        });
+
+        // 지우개 모드 시 터치/클릭한 드로잉 객체 삭제
+        fCanvas.on("mouse:down", function (options) {
+          if (fCanvas.currentTool === "eraser" && options.target) {
+            fCanvas.remove(options.target);
+          }
+        });
 
         init();
       };
 
-      function toggleDrawMode() {
-        isDrawMode = !isDrawMode;
-        const btn = document.getElementById("drawModeBtn");
-        if (isDrawMode) {
-          btn.classList.add("draw-active");
-          btn.innerText = "✍️ 그리기 중 (클릭 시 해제)";
-          drawCanvas.style.pointerEvents = "auto";
+      // 펜 / 지우개 / 이동 도구 설정
+      function setTool(tool) {
+        document
+          .querySelectorAll(".btn-tool")
+          .forEach((btn) => btn.classList.remove("active"));
+        fCanvas.currentTool = tool;
+
+        if (tool === "pen") {
+          document.getElementById("toolPenBtn").classList.add("active");
+          fCanvas.isDrawingMode = true;
+          fCanvas.freeDrawingBrush.color =
+            document.getElementById("penColor").value;
+        } else if (tool === "eraser") {
+          document.getElementById("toolEraserBtn").classList.add("active");
+          fCanvas.isDrawingMode = false;
         } else {
-          btn.classList.remove("draw-active");
-          btn.innerText = "✏️ 손그림 모드";
-          drawCanvas.style.pointerEvents = "none";
+          document.getElementById("toolSelectBtn").classList.add("active");
+          fCanvas.isDrawingMode = false;
         }
       }
 
-      function startDrawing(e) {
-        if (!isDrawMode) return;
-        isDrawing = true;
-        currentStroke = [];
-        const pos = getCanvasPos(e);
-        currentStroke.push(pos);
-
-        ctx.beginPath();
-        ctx.strokeStyle = document.getElementById("penColor").value;
-        ctx.lineWidth = 3;
-        ctx.lineCap = "round";
-        ctx.moveTo(pos.x, pos.y);
-      }
-
-      function draw(e) {
-        if (!isDrawing || !isDrawMode) return;
-        const pos = getCanvasPos(e);
-        currentStroke.push(pos);
-
-        ctx.lineTo(pos.x, pos.y);
-        ctx.stroke();
-      }
-
-      function stopDrawing() {
-        if (!isDrawing) return;
-        isDrawing = false;
-        ctx.closePath();
-
-        if (currentStroke.length > 1) {
-          socket.emit("drawing:stroke", {
-            boardId: currentBoardId,
-            points: currentStroke,
-            color: document.getElementById("penColor").value,
-            width: 3,
-          });
+      function updatePenColor() {
+        if (fCanvas) {
+          fCanvas.freeDrawingBrush.color =
+            document.getElementById("penColor").value;
         }
-      }
-
-      function getCanvasPos(e) {
-        const rect = drawCanvas.getBoundingClientRect();
-        return {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        };
-      }
-
-      function renderStroke(points, color, width) {
-        if (!points || points.length < 2) return;
-        ctx.beginPath();
-        ctx.strokeStyle = color || "#e1306c";
-        ctx.lineWidth = width || 3;
-        ctx.lineCap = "round";
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) {
-          ctx.lineTo(points[i].x, points[i].y);
-        }
-        ctx.stroke();
-        ctx.closePath();
       }
 
       function clearDrawings() {
-        if (confirm("캔버스의 모든 그림을 지우시겠습니까?")) {
+        if (confirm("캔버스의 모든 손그림을 지우시겠습니까?")) {
           socket.emit("drawing:clear", currentBoardId);
         }
       }
 
-      socket.on("drawing:stroke", (data) => {
-        renderStroke(data.points, data.color, data.width);
+      // 소켓 이벤트: 드로잉 패스 수신
+      socket.on("drawing:path", ({ svgPath }) => {
+        fabric.loadSVGFromString(svgPath, function (objects, options) {
+          const obj = fabric.util.groupSVGElements(objects, options);
+          fCanvas.add(obj);
+          fCanvas.renderAll();
+        });
       });
 
       socket.on("drawing:cleared", () => {
-        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        fCanvas.clear();
       });
 
+      // 마우스 커서 동기화
       document.addEventListener("mousemove", (e) => {
         socket.emit("cursor:move", { x: e.clientX, y: e.clientY });
 
@@ -441,10 +588,7 @@
         quill = new Quill("#quillEditor", {
           theme: "snow",
           modules: {
-            toolbar: [
-              ["bold", "italic", "underline"],
-              [{ color: [] }, { background: [] }],
-            ],
+            toolbar: [["bold", "italic", "underline"], [{ color: [] }]],
           },
         });
 
@@ -483,6 +627,7 @@
           socket.emit("board:join", currentBoardId);
           loadMemos();
           loadDrawings();
+          loadVoiceChannels();
         }
       }
 
@@ -495,19 +640,19 @@
       async function loadDrawings() {
         const res = await fetch(`/api/drawings/${currentBoardId}`);
         const drawings = await res.json();
-        ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+        fCanvas.clear();
         drawings.forEach((d) => {
-          try {
-            const points = JSON.parse(d.path_data);
-            renderStroke(points, d.color, d.width);
-          } catch (e) {}
+          fabric.loadSVGFromString(d.path_data, function (objects, options) {
+            const obj = fabric.util.groupSVGElements(objects, options);
+            fCanvas.add(obj);
+            fCanvas.renderAll();
+          });
         });
       }
 
       function renderCanvas(memos) {
         memosCache = {};
         const canvas = document.getElementById("canvas");
-
         const oldCards = canvas.querySelectorAll(".canvas-card");
         oldCards.forEach((c) => c.remove());
 
@@ -518,14 +663,14 @@
           card.id = `card-${memo.id}`;
           card.dataset.id = memo.id;
 
-          const posX = memo.pos_x || 120 + (index % 4) * 350;
-          const posY = memo.pos_y || 120 + Math.floor(index / 4) * 300;
+          const posX = memo.pos_x || 120 + (index % 4) * 340;
+          const posY = memo.pos_y || 120 + Math.floor(index / 4) * 280;
 
           card.style.left = `${posX}px`;
           card.style.top = `${posY}px`;
 
           card.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <div style="display:flex; justify-size:space-between; align-items:center; margin-bottom:6px;">
               <span style="font-size:0.75rem; background:#ffe6ed; color:var(--primary); padding:2px 6px; border-radius:4px; font-weight:bold;">${memo.category || "#아이디어"}</span>
               <span style="font-size:0.75rem; color:#888;">✍️ ${memo.author}</span>
             </div>
@@ -533,13 +678,12 @@
             <div class="script-box">${memo.rich_content || memo.script || "내용 없음"}</div>
 
             <div style="display:flex; gap:4px; margin-top:10px;">
-              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
-              <button style="font-size:0.7rem; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60; color:#fff; border:none; border-radius:4px; cursor:pointer;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
             </div>
           `;
 
           card.addEventListener("mousedown", (e) => {
-            if (isDrawMode || e.target.tagName === "BUTTON") return;
+            if (fCanvas.isDrawingMode || e.target.tagName === "BUTTON") return;
             isDraggingCard = true;
             dragTarget = card;
             dragOffset.x = e.clientX - card.offsetLeft;
@@ -553,16 +697,9 @@
       function openMemoModal(type) {
         document.getElementById("editMemoId").value = "";
         document.getElementById("editTitle").value =
-          type === "hook" ? "⚡ 3초 후킹 대본" : "📖 스토리텔링 대본";
-        document.getElementById("editCategory").value =
-          type === "hook" ? "#후킹" : "#스토리";
-
-        const defaultText =
-          type === "hook"
-            ? '<p><strong style="color:rgb(225,48,108);">[3초 후킹]</strong>: 아직도 ~하시나요?</p>'
-            : "<p><strong>[도입]</strong>: 완벽한 대본을 작성해보세요.</p>";
-
-        quill.clipboard.dangerouslyPasteHTML(defaultText);
+          type === "hook" ? "⚡ 3초 후킹 대본" : "📖 아이디어 대본";
+        document.getElementById("editCategory").value = "#릴스";
+        quill.clipboard.dangerouslyPasteHTML("<p>내용을 작성하세요...</p>");
         document.getElementById("memoModal").style.display = "flex";
       }
 
@@ -584,7 +721,7 @@
         socket.emit("memo:save", {
           id: id || undefined,
           board_id: currentBoardId,
-          title: document.getElementById("editTitle").value || "무제 노드",
+          title: document.getElementById("editTitle").value || "무제 메모",
           category: document.getElementById("editCategory").value || "#일반",
           rich_content: quill.root.innerHTML,
           script: quill.getText(),
@@ -595,10 +732,49 @@
         closeModal("memoModal");
       }
 
-      function deleteMemo(memoId) {
-        if (confirm("이 메모를 삭제하시겠습니까?")) {
-          socket.emit("memo:delete", { memoId, boardId: currentBoardId });
+      // 🎙️ 음성 채널 로직
+      async function loadVoiceChannels() {
+        const res = await fetch(`/api/voice-channels/${currentBoardId}`);
+        const channels = await res.json();
+        const listEl = document.getElementById("voiceChannelList");
+        listEl.innerHTML = channels
+          .map(
+            (c) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; padding:6px; background:#313244; border-radius:6px;">
+            <span>🔊 ${c.name} (최대 ${c.max_users}명)</span>
+            <button style="font-size:0.7rem; background:#a6e3a1; color:#000; border:none; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer;" onclick="joinVoiceChannel('${c.id}', ${c.max_users})">참여</button>
+          </div>
+        `,
+          )
+          .join("");
+      }
+
+      function openVoiceCreateModal() {
+        document.getElementById("voiceModal").style.display = "flex";
+      }
+
+      async function createVoiceChannel() {
+        const name = document.getElementById("voiceRoomName").value;
+        const max_users = document.getElementById("voiceMaxUsers").value;
+        if (!name) return;
+
+        await fetch("/api/voice-channels", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ board_id: currentBoardId, name, max_users }),
+        });
+
+        closeModal("voiceModal");
+        loadVoiceChannels();
+      }
+
+      function joinVoiceChannel(roomId, maxUsers) {
+        if (activeVoiceRoomId) {
+          socket.emit("voice:leave", { roomId: activeVoiceRoomId });
         }
+        activeVoiceRoomId = roomId;
+        socket.emit("voice:join", { roomId, maxUsers });
+        alert("음성 채널에 연결되었습니다. (마이크 허용 필요)");
       }
 
       function closeModal(id) {
@@ -611,6 +787,9 @@
       });
 
       socket.on("memo:updated", () => loadMemos());
+      socket.on("voice:full", () =>
+        alert("해당 음성 채널 인원이 가득 찼습니다!"),
+      );
 
       init();
     </script>
