@@ -125,6 +125,47 @@
         margin-top: 8px;
         white-space: pre-wrap;
       }
+      .char-warning {
+        color: #d9534f;
+        font-size: 0.75rem;
+        font-weight: bold;
+        display: none;
+        margin-top: 4px;
+      }
+
+      /* 🎬 릴스/유튜브 호버 영상 미리보기 */
+      .video-preview-wrapper {
+        position: relative;
+        display: inline-block;
+        margin-top: 6px;
+      }
+      .video-preview-btn {
+        font-size: 0.75rem;
+        color: #3897f0;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .video-preview-popup {
+        display: none;
+        position: absolute;
+        bottom: 25px;
+        left: 0;
+        width: 220px;
+        height: 380px;
+        background: #000;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+      }
+      .video-preview-wrapper:hover .video-preview-popup {
+        display: block;
+      }
+      .video-preview-popup iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
 
       #canvasView {
         display: none;
@@ -192,6 +233,31 @@
         color: #fff;
       }
 
+      /* 댓글 `@` 멘션 드롭다운 */
+      #mentionDropdown {
+        display: none;
+        position: absolute;
+        background: #fff;
+        color: #000;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        max-height: 120px;
+        overflow-y: auto;
+        z-index: 3000;
+        width: 160px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      }
+      #mentionDropdown div {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      #mentionDropdown div:hover {
+        background: #ffe6ed;
+        color: var(--primary);
+        font-weight: bold;
+      }
+
       .tool-btn.active {
         background: var(--primary) !important;
         color: white !important;
@@ -224,6 +290,19 @@
         max-width: 500px;
         max-height: 85vh;
         overflow-y: auto;
+      }
+      .reels-phone-frame {
+        width: 270px;
+        height: 480px;
+        background: #000;
+        color: #fff;
+        border-radius: 20px;
+        padding: 15px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin: 0 auto;
       }
 
       .sidebar {
@@ -261,6 +340,22 @@
         font-weight: bold;
         border: none;
         cursor: pointer;
+      }
+
+      /* 숨겨진 어드민 콘솔 복원 */
+      #adminConsole {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 420px;
+        background: #1e1e1e;
+        color: #00ff66;
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 3000;
+        font-family: monospace;
       }
     </style>
   </head>
@@ -371,7 +466,6 @@
       >
         <h2 id="currentBoardTitle">기본 게시판</h2>
 
-        <!-- 🎯 대본 유형별 작성 버튼 복원 -->
         <div style="display: flex; gap: 6px">
           <button
             style="width: auto; background: var(--primary)"
@@ -532,7 +626,7 @@
       </div>
     </div>
 
-    <!-- 메모 작성/수정 모달 -->
+    <!-- 메모 작성/수정 모달 (복원 필드 탑재) -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
         <h3>📝 메모/대본 작성</h3>
@@ -551,17 +645,102 @@
           <option value="완료">✅ 완료</option>
         </select>
 
+        <label>인스타 릴스 / 유튜브 URL (미리보기 지원)</label>
+        <input type="text" id="editVideoUrl" placeholder="https://..." />
+
+        <label>BGM 음원명 및 링크</label>
+        <div style="display: flex; gap: 5px">
+          <input type="text" id="editBgmTitle" placeholder="음원명" />
+          <input type="text" id="editBgmUrl" placeholder="링크 (URL)" />
+        </div>
+
         <label>대본 (서식 편집 지원)</label>
         <div
           id="quillEditor"
           style="height: 140px; background: #fff; color: #000; margin-top: 6px"
         ></div>
+        <div id="scriptWarning" class="char-warning">
+          ⚠️ 한 줄에 20자가 넘는 구절이 있습니다! 릴스 자막 가독성이 떨어질 수
+          있습니다.
+        </div>
 
         <div style="display: flex; gap: 10px; margin-top: 15px">
           <button onclick="saveMemoModal()">저장하기</button>
           <button style="background: #666" onclick="closeModal('memoModal')">
             취소
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 댓글 모달 -->
+    <div id="commentModal" class="modal-bg">
+      <div class="modal" style="position: relative">
+        <h3>💬 아이디어 토론 댓글</h3>
+        <div
+          id="commentList"
+          style="
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+          "
+        ></div>
+
+        <div id="mentionDropdown"></div>
+
+        <textarea
+          id="newCommentText"
+          placeholder="댓글 입력 (@ 입력 시 팀원 자동완성)"
+          rows="2"
+          oninput="handleMentionInput(this)"
+        ></textarea>
+        <button onclick="submitComment()" style="margin-top: 6px">
+          댓글 작성
+        </button>
+        <button
+          style="background: #666; margin-top: 5px"
+          onclick="closeModal('commentModal')"
+        >
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 📱 9:16 미리보기 모달 -->
+    <div id="reelsModal" class="modal-bg">
+      <div class="modal" style="background: transparent; box-shadow: none">
+        <div class="reels-phone-frame">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 0.8rem;
+            "
+          >
+            <span id="reelsPreviewTitle">릴스 미리보기</span>
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
+              >✕</span
+            >
+          </div>
+          <div
+            style="
+              text-align: center;
+              padding: 20px;
+              font-size: 1.1rem;
+              font-weight: bold;
+              background: rgba(0, 0, 0, 0.6);
+              border-radius: 10px;
+            "
+            id="reelsPreviewScript"
+          >
+            자막이 여기에 표시됩니다.
+          </div>
+          <div style="font-size: 0.8rem">
+            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
+          </div>
         </div>
       </div>
     </div>
@@ -590,16 +769,86 @@
       </div>
     </div>
 
+    <!-- 히스토리 모달 -->
+    <div id="historyModal" class="modal-bg">
+      <div class="modal">
+        <h3>📜 대본 변경 이력 (History)</h3>
+        <div id="historyList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('historyModal')"
+        >
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 휴지통 모달 -->
+    <div id="trashModal" class="modal-bg">
+      <div class="modal">
+        <h3>🗑️ 휴지통 (60일 보관)</h3>
+        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('trashModal')"
+        >
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 어드민 콘솔 복원 -->
+    <div id="adminConsole">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <h3 style="margin: 0">⚡ ADMIN CONSOLE</h3>
+        <span style="cursor: pointer" onclick="closeAdminConsole()">✕</span>
+      </div>
+      <p style="font-size: 0.8rem">신규 팀원 생성 및 활동 로그</p>
+      <input type="text" id="adminNewName" placeholder="닉네임" />
+      <input type="text" id="adminNewUsername" placeholder="아이디" />
+      <input type="password" id="adminNewPassword" placeholder="비밀번호" />
+      <select id="adminNewRole">
+        <option value="Member">Member</option>
+        <option value="Admin">Admin</option>
+        <option value="Viewer">Viewer</option>
+      </select>
+      <button onclick="addNewUser()">계정 추가하기</button>
+      <hr style="margin: 15px 0; border-color: #444" />
+      <button
+        style="background: #333; color: #00ff66"
+        onclick="loadAuditLogs()"
+      >
+        📜 활동 로그 조회
+      </button>
+      <div
+        id="auditLogBox"
+        style="
+          font-size: 0.75rem;
+          max-height: 120px;
+          overflow-y: auto;
+          margin-top: 8px;
+        "
+      ></div>
+    </div>
+
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
       let activeSelectedMemoId = null;
+      let selectedMemoForComment = null;
       let clipboardData = null;
       let quill = null;
       let activeView = "kanban";
       let currentTool = "pan";
       let memosCache = {};
+      let teamMembers = [];
 
       let canvasWidth =
         parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
@@ -618,8 +867,26 @@
       let panStart = { x: 0, y: 0 };
       let canvasPos = { x: 0, y: 0 };
 
+      function getEmbedUrl(url) {
+        if (!url) return null;
+        const ytMatch = url.match(
+          /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
+        );
+        if (ytMatch && ytMatch[1])
+          return `https://www.youtube.com/embed/${ytMatch[1]}`;
+        const instaMatch = url.match(
+          /instagram\.com\/(?:p|reel|reels)\/([^/?#&]+)/,
+        );
+        if (instaMatch && instaMatch[1])
+          return `https://www.instagram.com/p/${instaMatch[1]}/embed`;
+        return null;
+      }
+
       window.onload = () => {
         quill = new Quill("#quillEditor", { theme: "snow" });
+
+        // 🎯 자막 가독성 실시간 검사 복원
+        quill.on("text-change", () => checkScriptWarning(quill.getText()));
 
         pCanvas = document.getElementById("paintCanvas");
         ctx = pCanvas.getContext("2d");
@@ -750,6 +1017,65 @@
         init();
       };
 
+      // 🎯 [복원] 자막 가독성 검사 함수
+      function checkScriptWarning(text) {
+        const lines = text.split("\n");
+        const hasLongLine = lines.some((l) => l.length > 20);
+        document.getElementById("scriptWarning").style.display = hasLongLine
+          ? "block"
+          : "none";
+      }
+
+      // 🎯 [복원] 어드민 콘솔 숨겨진 키 시퀀스 이스터에그
+      const secretSequence = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowUp",
+        "ArrowLeft",
+        "ArrowUp",
+        "ArrowRight",
+        "ArrowUp",
+      ];
+      let inputBuffer = [];
+      document.addEventListener("keydown", (e) => {
+        inputBuffer.push(e.key);
+        if (inputBuffer.length > secretSequence.length) inputBuffer.shift();
+        if (JSON.stringify(inputBuffer) === JSON.stringify(secretSequence)) {
+          document.getElementById("adminConsole").style.display = "block";
+          inputBuffer = [];
+        }
+      });
+
+      function closeAdminConsole() {
+        document.getElementById("adminConsole").style.display = "none";
+      }
+
+      async function addNewUser() {
+        const name = document.getElementById("adminNewName").value;
+        const username = document.getElementById("adminNewUsername").value;
+        const password = document.getElementById("adminNewPassword").value;
+        const role = document.getElementById("adminNewRole").value;
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, username, password, role }),
+        });
+        const data = await res.json();
+        if (data.success) alert("계정이 생성되었습니다!");
+        else alert(data.message);
+      }
+
+      async function loadAuditLogs() {
+        const res = await fetch("/api/logs");
+        const logs = await res.json();
+        document.getElementById("auditLogBox").innerHTML = logs
+          .map(
+            (l) =>
+              `<div>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}: ${l.action}</div>`,
+          )
+          .join("");
+      }
+
       function toggleAutoResize() {
         isAutoResizing = !isAutoResizing;
         const btn = document.getElementById("btnResizeToggle");
@@ -810,7 +1136,55 @@
           document.getElementById("loginView").style.display = "none";
           switchView("kanban");
           loadBoards();
+          loadTeamMembers();
         }
+      }
+
+      async function loadTeamMembers() {
+        const res = await fetch("/api/users");
+        teamMembers = await res.json();
+      }
+
+      function handleMentionInput(textarea) {
+        const val = textarea.value;
+        const cursor = textarea.selectionStart;
+        const lastAt = val.lastIndexOf("@", cursor);
+        const dropdown = document.getElementById("mentionDropdown");
+
+        if (lastAt !== -1 && lastAt < cursor) {
+          const query = val.slice(lastAt + 1, cursor).toLowerCase();
+          const matches = teamMembers.filter(
+            (m) =>
+              m.name.toLowerCase().includes(query) ||
+              m.username.toLowerCase().includes(query),
+          );
+
+          if (matches.length > 0) {
+            dropdown.innerHTML = matches
+              .map(
+                (m) => `
+              <div onclick="selectMention('${m.name}', ${lastAt})">@${m.name} (${m.username})</div>
+            `,
+              )
+              .join("");
+            dropdown.style.left = `${textarea.offsetLeft + 10}px`;
+            dropdown.style.top = `${textarea.offsetTop - 80}px`;
+            dropdown.style.display = "block";
+            return;
+          }
+        }
+        dropdown.style.display = "none";
+      }
+
+      function selectMention(name, lastAtIndex) {
+        const textarea = document.getElementById("newCommentText");
+        const val = textarea.value;
+        textarea.value =
+          val.slice(0, lastAtIndex) +
+          `@${name} ` +
+          val.slice(textarea.selectionStart);
+        document.getElementById("mentionDropdown").style.display = "none";
+        textarea.focus();
       }
 
       function setTool(tool) {
@@ -889,7 +1263,6 @@
         }
       }
 
-      // 🎯 [게시판 삭제 기능] Admin / 관리자 삭제 및 프론트엔드 연동
       async function deleteBoard(boardId, boardName) {
         if (
           !confirm(
@@ -1022,9 +1395,11 @@
 
         memos.forEach((memo) => {
           memosCache[memo.id] = memo;
+          const estSeconds = Math.ceil((memo.script || "").length / 6);
           const colEl =
             document.getElementById(`col-${memo.status}`) ||
             document.getElementById("col-아이디어");
+          const embedUrl = getEmbedUrl(memo.video_url);
 
           const card = document.createElement("div");
           card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
@@ -1036,12 +1411,38 @@
           };
 
           card.innerHTML = `
+            ${memo.is_pinned ? '📌 <b style="color:var(--primary); font-size:0.75rem;">고정됨</b><br>' : ""}
             <span class="badge">${memo.category || "일반"}</span>
             <h4 style="margin:6px 0;">${memo.title}</h4>
             <div class="script-box">${memo.rich_content || memo.script || "대본 없음"}</div>
+            <div style="font-size:0.75rem; color:#2b8a3e; margin-top:4px;">⏱️ 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
+            
+            ${
+              memo.video_url
+                ? `
+              <div class="video-preview-wrapper">
+                <div class="video-preview-btn">▶️ 영상 미리보기 (호버)</div>
+                <div class="video-preview-popup">
+                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:15px;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[바로가기]</a></div>`}
+                </div>
+              </div>
+            `
+                : ""
+            }
+
+            <div style="display:flex; gap:4px; margin-top:8px;">
+              <button style="font-size:0.7rem; padding:2px 6px;" onclick="openReelsModal('${memo.title}', \`${memo.script}\`, '${memo.bgm_title}')">📱 9:16뷰어</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#4a90e2;" onclick="openCommentModal('${memo.id}')">💬 댓글</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#7f8c8d;" onclick="openHistoryModal('${memo.id}')">📜 히스토리</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
+            </div>
+
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.75rem; color:#888;">
               <span>✍️ ${memo.author}</span>
-              <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
+              <div>
+                <button style="width:auto; padding:2px 6px;" onclick="likeMemo('${memo.id}')">❤️ ${memo.likes || 0}</button>
+                <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
+              </div>
             </div>
           `;
           colEl.appendChild(card);
@@ -1108,9 +1509,23 @@
         });
       }
 
-      // 🎯 대본 유형별 모달 오픈 함수 복원
+      // 🎯 [복원] 기본 대본 양식 자동 삽입
+      function openMemoEditModal() {
+        document.getElementById("editMemoId").value = "";
+        document.getElementById("editTitle").value = "";
+        document.getElementById("editCategory").value = "";
+        document.getElementById("editVideoUrl").value = "";
+        document.getElementById("editBgmTitle").value = "";
+        document.getElementById("editBgmUrl").value = "";
+        quill.clipboard.dangerouslyPasteHTML("[후킹]: \n[본문]: \n[CTA]: ");
+        document.getElementById("memoModal").style.display = "flex";
+      }
+
       function openMemoModalWithType(type) {
         document.getElementById("editMemoId").value = "";
+        document.getElementById("editVideoUrl").value = "";
+        document.getElementById("editBgmTitle").value = "";
+        document.getElementById("editBgmUrl").value = "";
 
         if (type === "hook") {
           document.getElementById("editTitle").value = "⚡ 3초 후킹 대본 노드";
@@ -1133,12 +1548,33 @@
         document.getElementById("memoModal").style.display = "flex";
       }
 
+      // 🎯 [복원] BGM 정보 바인딩
+      function editMemo(memoId) {
+        const memo = memosCache[memoId];
+        if (!memo) return;
+        document.getElementById("editMemoId").value = memo.id;
+        document.getElementById("editTitle").value = memo.title;
+        document.getElementById("editCategory").value = memo.category || "";
+        document.getElementById("editVideoUrl").value = memo.video_url || "";
+        document.getElementById("editBgmTitle").value = memo.bgm_title || "";
+        document.getElementById("editBgmUrl").value = memo.bgm_url || "";
+        quill.clipboard.dangerouslyPasteHTML(
+          memo.rich_content || memo.script || "",
+        );
+        document.getElementById("memoModal").style.display = "flex";
+      }
+
       function saveMemoModal() {
+        const id = document.getElementById("editMemoId").value;
         const memoData = {
+          id: id || undefined,
           board_id: currentBoardId,
           title: document.getElementById("editTitle").value || "무제 아이디어",
           category: document.getElementById("editCategory").value || "#일반",
           status: document.getElementById("editStatus").value,
+          video_url: document.getElementById("editVideoUrl").value,
+          bgm_title: document.getElementById("editBgmTitle").value,
+          bgm_url: document.getElementById("editBgmUrl").value,
           rich_content: quill.root.innerHTML,
           script: quill.getText(),
           author: currentUser.name,
@@ -1147,10 +1583,125 @@
         closeModal("memoModal");
       }
 
+      function openReelsModal(title, script, bgm) {
+        document.getElementById("reelsPreviewTitle").innerText = title;
+        document.getElementById("reelsPreviewScript").innerText =
+          script || "대본이 없습니다.";
+        document.getElementById("reelsPreviewBgm").innerText =
+          bgm || "기본 음원";
+        document.getElementById("reelsModal").style.display = "flex";
+      }
+
+      async function openCommentModal(memoId) {
+        selectedMemoForComment = memoId;
+        const res = await fetch(`/api/comments/${memoId}`);
+        const comments = await res.json();
+        const box = document.getElementById("commentList");
+        box.innerHTML = comments
+          .map(
+            (c) => `
+          <div style="font-size:0.8rem; margin-bottom:6px;">
+            <b>${c.author}:</b> ${c.content} <span style="color:#aaa; font-size:0.7rem;">(${new Date(c.created_at).toLocaleTimeString()})</span>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("commentModal").style.display = "flex";
+      }
+
+      function submitComment() {
+        const text = document.getElementById("newCommentText").value;
+        if (!text) return;
+        socket.emit("comment:add", {
+          memoId: selectedMemoForComment,
+          boardId: currentBoardId,
+          content: text,
+        });
+        document.getElementById("newCommentText").value = "";
+        closeModal("commentModal");
+      }
+
+      async function openAuditLogsModal() {
+        const res = await fetch("/api/logs");
+        const logs = await res.json();
+        document.getElementById("auditLogModalBox").innerHTML = logs
+          .map(
+            (l) => `
+          <div style="margin-bottom:6px; border-bottom:1px solid #eee; padding-bottom:4px;">
+            <b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("auditLogModal").style.display = "flex";
+      }
+
+      async function openHistoryModal(memoId) {
+        const res = await fetch(`/api/history/${memoId}`);
+        const logs = await res.json();
+        const box = document.getElementById("historyList");
+        box.innerHTML = logs
+          .map(
+            (l) => `
+          <div style="font-size:0.8rem; border-bottom:1px solid #ccc; padding:6px 0;">
+            <div>✍️ <b>${l.edited_by}</b> (${new Date(l.created_at).toLocaleString()})</div>
+            <pre style="background:#eee; padding:4px;">${l.script}</pre>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("historyModal").style.display = "flex";
+      }
+
+      async function toggleTrashModal() {
+        const res = await fetch(`/api/trash/${currentBoardId}`);
+        const trashMemos = await res.json();
+        const box = document.getElementById("trashList");
+        box.innerHTML = trashMemos
+          .map(
+            (t) => `
+          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-bottom:6px;">
+            <span>${t.title} (삭제일: ${new Date(t.deleted_at).toLocaleDateString()})</span>
+            <button style="width:auto; padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button>
+          </div>
+        `,
+          )
+          .join("");
+        document.getElementById("trashModal").style.display = "flex";
+      }
+
+      async function restoreMemo(memoId) {
+        await fetch("/api/memos/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memoId }),
+        });
+        closeModal("trashModal");
+        loadMemos();
+      }
+
       function deleteMemo(memoId) {
         if (confirm("이 메모를 삭제하시겠습니까?")) {
           socket.emit("memo:delete", { memoId, boardId: currentBoardId });
         }
+      }
+
+      function likeMemo(memoId) {
+        socket.emit("memo:like", { memoId, boardId: currentBoardId });
+      }
+
+      async function exportTXT() {
+        const res = await fetch(`/api/memos/${currentBoardId}`);
+        const memos = await res.json();
+        let content = `🎬 [릴스 대본 집합]\n\n`;
+        memos.forEach((m, i) => {
+          content += `============== ${i + 1}. ${m.title} ==============\n대본:\n${m.script}\n\n`;
+        });
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `reels_scripts_${Date.now()}.txt`;
+        a.click();
       }
 
       socket.on("board:deleted", () => loadBoards());
