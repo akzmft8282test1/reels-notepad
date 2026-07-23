@@ -36,6 +36,49 @@ if (localStorage.getItem("darkMode") === "true") {
   document.body.classList.add("dark-mode");
 }
 
+// 캔버스 크기 적용 함수
+function applyCanvasSize(w, h) {
+  canvasWidth = w;
+  canvasHeight = h;
+  if (pCanvas) {
+    pCanvas.width = w;
+    pCanvas.height = h;
+  }
+  const sizeInfo = document.getElementById("canvasSizeInfo");
+  if (sizeInfo) {
+    sizeInfo.innerText = `${w}x${h}px`;
+  }
+}
+
+// 로그인 함수 (Form Submit 이벤트 처리 및 /? 방지)
+async function login(e) {
+  if (e) e.preventDefault(); // 폼 제출 시 페이지 새로고침 및 주소 이동 방지
+
+  const usernameInput = document.getElementById("username").value;
+  const passwordInput = document.getElementById("password").value;
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: usernameInput,
+        password: passwordInput,
+      }),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      location.reload(); // 로그인 성공 시 메인 화면으로 새로고침
+    } else {
+      alert(data.message || "로그인 실패");
+    }
+  } catch (err) {
+    console.error("Login error:", err);
+    alert("로그인 처리 중 오류가 발생했습니다.");
+  }
+}
+
 window.onload = () => {
   quill = new Quill("#quillEditor", { theme: "snow" });
 
@@ -44,49 +87,6 @@ window.onload = () => {
 
   applyCanvasSize(canvasWidth, canvasHeight);
   updateGridSnapUI();
-
-  // 1. 누락되었던 캔버스 크기 적용 함수 추가
-  function applyCanvasSize(w, h) {
-    canvasWidth = w;
-    canvasHeight = h;
-    if (pCanvas) {
-      pCanvas.width = w;
-      pCanvas.height = h;
-    }
-    const sizeInfo = document.getElementById("canvasSizeInfo");
-    if (sizeInfo) {
-      sizeInfo.innerText = `${w}x${h}px`;
-    }
-  }
-
-  // 2. 로그인 함수 수정 (Form event 대응)
-  async function login(e) {
-    if (e) e.preventDefault(); // 폼 제출 시 페이지 새로고침 방지
-
-    const usernameInput = document.getElementById("username").value;
-    const passwordInput = document.getElementById("password").value;
-
-    try {
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: usernameInput,
-          password: passwordInput,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        location.reload(); // 로그인 성공 시 정상 새로고침하여 메인 화면 진입
-      } else {
-        alert(data.message || "로그인 실패");
-      }
-    } catch (err) {
-      console.error("Login error:", err);
-      alert("로그인 처리 중 오류가 발생했습니다.");
-    }
-  }
 
   // 모바일/터치 지원 캔버스 드로잉 이벤트
   const getCanvasCoords = (e) => {
@@ -270,9 +270,11 @@ function toggleGridSnap() {
 function updateGridSnapUI() {
   const btn = document.getElementById("btnGridSnap");
   const container = document.getElementById("canvasContainer");
-  btn.innerText = `🧲 그리드스냅: ${isGridSnapEnabled ? "ON" : "OFF"}`;
-  if (isGridSnapEnabled) container.classList.add("grid-snapping");
-  else container.classList.remove("grid-snapping");
+  if (btn) btn.innerText = `🧲 그리드스냅: ${isGridSnapEnabled ? "ON" : "OFF"}`;
+  if (container) {
+    if (isGridSnapEnabled) container.classList.add("grid-snapping");
+    else container.classList.remove("grid-snapping");
+  }
 }
 
 function snapToGrid(val) {
@@ -450,6 +452,7 @@ function updateCanvasTransform() {
 
 function updateMinimap() {
   const viewport = document.getElementById("minimapViewport");
+  if (!viewport) return;
   const ratioX = 160 / canvasWidth;
   const ratioY = 120 / canvasHeight;
 
@@ -477,13 +480,21 @@ function handleSearch(keyword) {
 
 // 기본 유틸 및 초기화
 async function init() {
-  const res = await fetch("/api/me");
-  const data = await res.json();
-  if (data.loggedIn) {
-    currentUser = data.user;
-    document.getElementById("loginView").style.display = "none";
-    switchView("kanban");
-    loadBoards();
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) {
+      document.getElementById("loginView").style.display = "block";
+      return;
+    }
+    const data = await res.json();
+    if (data.loggedIn) {
+      currentUser = data.user;
+      document.getElementById("loginView").style.display = "none";
+      switchView("kanban");
+      loadBoards();
+    }
+  } catch (err) {
+    console.log("비로그인 상태이거나 서버 연결에 실패했습니다.");
   }
 }
 
@@ -510,7 +521,8 @@ async function loadBoards() {
 
 function selectBoard(id, name) {
   currentBoardId = id;
-  document.getElementById("currentBoardTitle").innerText = name;
+  const titleEl = document.getElementById("currentBoardTitle");
+  if (titleEl) titleEl.innerText = name;
   socket.emit("board:join", id);
   loadMemos();
   loadShapes();
@@ -532,9 +544,10 @@ async function loadMemos() {
 }
 
 function renderKanban(memos) {
-  ["아이디어", "대본작성", "촬영예정", "완료"].forEach(
-    (s) => (document.getElementById(`col-${s}`).innerHTML = ""),
-  );
+  ["아이디어", "대본작성", "촬영예정", "완료"].forEach((s) => {
+    const col = document.getElementById(`col-${s}`);
+    if (col) col.innerHTML = "";
+  });
   memos.forEach((memo) => {
     memosCache[memo.id] = memo;
     const card = document.createElement("div");
@@ -549,9 +562,10 @@ function renderKanban(memos) {
         <button class="bg-red" onclick="deleteMemo('${memo.id}')">🗑️ 삭제</button>
       </div>
     `;
-    document
-      .getElementById(`col-${memo.status || "아이디어"}`)
-      .appendChild(card);
+    const targetCol = document.getElementById(
+      `col-${memo.status || "아이디어"}`,
+    );
+    if (targetCol) targetCol.appendChild(card);
   });
 }
 
@@ -597,20 +611,6 @@ function toggleSidebar() {
 }
 function closeModal(id) {
   document.getElementById(id).style.display = "none";
-}
-
-async function login() {
-  const res = await fetch("/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      username: document.getElementById("username").value,
-      password: document.getElementById("password").value,
-    }),
-  });
-  const data = await res.json();
-  if (data.success) location.reload();
-  else alert(data.message);
 }
 
 // 실시간 Presence 및 커서 이벤트
