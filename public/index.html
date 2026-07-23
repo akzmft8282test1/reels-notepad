@@ -100,7 +100,8 @@
         outline: none;
       }
       .card.selected,
-      .canvas-card.selected {
+      .canvas-card.selected,
+      .sticky-note.selected {
         border: 2px solid var(--primary) !important;
         box-shadow: 0 0 12px rgba(225, 48, 108, 0.5);
       }
@@ -134,7 +135,7 @@
         margin-top: 4px;
       }
 
-      /* 🎬 1. 링크 클릭 및 호버 시 칸에 제한받지 않는 독립 레이어 (Z-Index 최상위) */
+      /* 영상 미리보기 팝업 */
       .video-preview-wrapper {
         position: relative;
         display: inline-block;
@@ -228,7 +229,6 @@
         opacity: 0.8;
       }
 
-      /* 🎨 피그마 주요기능: 멀티플레이어 커서 표시 */
       .remote-cursor {
         position: absolute;
         pointer-events: none;
@@ -248,7 +248,7 @@
         font-size: 1.2rem;
       }
 
-      /* 🎨 피그마 주요기능: 피그잼 스티키 노트 */
+      /* 스티키 노트 스타일 */
       .sticky-note {
         position: absolute;
         width: 180px;
@@ -258,11 +258,12 @@
         box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15);
         z-index: 12;
         font-weight: bold;
-        border: none;
+        border: 1px solid rgba(0, 0, 0, 0.1);
         resize: both;
+        outline: none;
       }
 
-      /* 🎨 피그마 주요기능: 미니맵 UI */
+      /* 미니맵 UI */
       #minimap {
         position: absolute;
         bottom: 20px;
@@ -594,7 +595,7 @@
       </div>
     </div>
 
-    <!-- 2. 무한 캔버스 뷰 + 피그마 툴바 -->
+    <!-- 2. 무한 캔버스 뷰 -->
     <div id="canvasView">
       <div
         style="
@@ -645,7 +646,6 @@
           🧹 지우개
         </button>
 
-        <!-- 🎨 피그마 TOP 10 기능 도구 모음 -->
         <button
           style="width: auto; padding: 4px 10px; background: #f39c12"
           onclick="addShape('rect')"
@@ -707,7 +707,6 @@
         <canvas id="paintCanvas" width="3000" height="3000"></canvas>
       </div>
 
-      <!-- 🎨 피그마 미니맵 (Minimap) -->
       <div id="minimap">
         <div id="minimapViewport"></div>
       </div>
@@ -947,6 +946,7 @@
       let currentUser = null;
       let currentBoardId = null;
       let activeSelectedMemoId = null;
+      let activeSelectedElement = null; // 선택된 스티키노트/도형 바인딩
       let selectedMemoForComment = null;
       let clipboardData = null;
       let quill = null;
@@ -988,7 +988,6 @@
         return null;
       }
 
-      // 🎬 1. 영상 미리보기 토글 (칸의 영역 제한을 받지 않고 독립레이어로 팝업)
       function toggleVideoPreview(memoId) {
         const popup = document.getElementById(`preview-popup-${memoId}`);
         if (popup) {
@@ -1063,7 +1062,6 @@
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
-        // 🎨 피그마 기능: Ctrl + 휠 캔버스 Zoom 확대/축소
         canvasView.addEventListener(
           "wheel",
           (e) => {
@@ -1077,7 +1075,6 @@
           { passive: false },
         );
 
-        // 🎨 피그마 기능: 실시간 마우스 위치 멀티플레이어 커서 공유
         canvasView.addEventListener("mousemove", (e) => {
           if (currentBoardId && currentUser) {
             const rect = container.getBoundingClientRect();
@@ -1127,28 +1124,30 @@
           const contextMenu = document.getElementById("contextMenu");
 
           if (cardEl) {
+            activeSelectedElement = cardEl;
             activeSelectedMemoId =
               cardEl.dataset.id || cardEl.id.replace("card-", "");
-            highlightSelectedCard(activeSelectedMemoId);
-          }
+            highlightSelectedCard(activeSelectedMemoId, cardEl);
 
-          contextMenu.style.left = `${e.clientX}px`;
-          contextMenu.style.top = `${e.clientY}px`;
-          contextMenu.style.display = "block";
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.display = "block";
+          }
         });
 
         window.addEventListener("click", () => {
           document.getElementById("contextMenu").style.display = "none";
         });
 
-        // 🎨 피그마 기능: 단축키 지원 (Ctrl+D 복제, Del 삭제, V/H/P 툴 전환)
+        // 🎯 삭제(Delete/Backspace) 키 처리 로직
         window.addEventListener("keydown", (e) => {
           const activeTag = document.activeElement
             ? document.activeElement.tagName.toLowerCase()
             : "";
           const isEditingText =
             activeTag === "input" ||
-            activeTag === "textarea" ||
+            (activeTag === "textarea" &&
+              document.activeElement !== activeSelectedElement) ||
             document.activeElement.classList.contains("ql-editor");
 
           if (isEditingText) return;
@@ -1166,13 +1165,19 @@
             contextAction("duplicate");
           }
 
-          if (
-            (e.key === "Delete" || e.key === "Backspace") &&
-            activeSelectedMemoId
-          ) {
-            e.preventDefault();
-            deleteMemo(activeSelectedMemoId);
-            activeSelectedMemoId = null;
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (
+              activeSelectedElement &&
+              activeSelectedElement.classList.contains("sticky-note")
+            ) {
+              e.preventDefault();
+              activeSelectedElement.remove();
+              activeSelectedElement = null;
+            } else if (activeSelectedMemoId) {
+              e.preventDefault();
+              deleteMemo(activeSelectedMemoId);
+              activeSelectedMemoId = null;
+            }
           }
         });
 
@@ -1185,7 +1190,6 @@
         updateMinimap();
       }
 
-      // 🎨 피그마 기능: 미니맵 동기화
       function updateMinimap() {
         const viewport = document.getElementById("minimapViewport");
         const ratioX = 160 / canvasWidth;
@@ -1197,7 +1201,7 @@
         viewport.style.top = `${Math.max(0, -canvasPos.y * ratioY)}px`;
       }
 
-      // 🎨 피그마 기능: 피그잼 스티키 노트 추가
+      // 🎯 선택 모드 드래그 가능 스티키 노트
       function addStickyNote(color) {
         const id = "sticky-" + Date.now();
         const note = document.createElement("textarea");
@@ -1208,10 +1212,19 @@
         note.style.top = `${200 - canvasPos.y}px`;
         note.placeholder = "아이디어 메모...";
 
+        makeDraggable(note);
+
+        note.onclick = (e) => {
+          e.stopPropagation();
+          activeSelectedElement = note;
+          activeSelectedMemoId = id;
+          highlightSelectedCard(id, note);
+        };
+
         document.getElementById("canvasContainer").appendChild(note);
       }
 
-      // 🎨 피그마 기능: 기본 도형 그리기
+      // 🎯 선택 모드 드래그 가능 도형
       function addShape(type) {
         const shape = document.createElement("div");
         shape.className = "canvas-card";
@@ -1222,7 +1235,45 @@
         shape.style.background = document.getElementById("penColor").value;
 
         if (type === "circle") shape.style.borderRadius = "50%";
+
+        makeDraggable(shape);
+
+        shape.onclick = (e) => {
+          e.stopPropagation();
+          activeSelectedElement = shape;
+          activeSelectedMemoId = shape.id;
+          highlightSelectedCard(shape.id, shape);
+        };
+
         document.getElementById("canvasContainer").appendChild(shape);
+      }
+
+      // 🎯 선택 모드(`select`) 드래그 앤 드롭 범용 처리 함수
+      function makeDraggable(element) {
+        let isDragging = false,
+          offsetLeft = 0,
+          offsetTop = 0;
+
+        element.addEventListener("mousedown", (e) => {
+          if (currentTool !== "select" || element.classList.contains("locked"))
+            return;
+          isDragging = true;
+          offsetLeft = e.clientX / zoomLevel - element.offsetLeft;
+          offsetTop = e.clientY / zoomLevel - element.offsetTop;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (isDragging && currentTool === "select") {
+            const newX = e.clientX / zoomLevel - offsetLeft;
+            const newY = e.clientY / zoomLevel - offsetTop;
+            element.style.left = `${newX}px`;
+            element.style.top = `${newY}px`;
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          isDragging = false;
+        });
       }
 
       function checkScriptWarning(text) {
@@ -1416,14 +1467,18 @@
         }
       }
 
-      function highlightSelectedCard(memoId) {
+      function highlightSelectedCard(memoId, element = null) {
         document
-          .querySelectorAll(".card, .canvas-card")
+          .querySelectorAll(".card, .canvas-card, .sticky-note")
           .forEach((el) => el.classList.remove("selected"));
-        const target = document.querySelector(
-          `.card[data-id="${memoId}"], #card-${memoId}`,
-        );
-        if (target) target.classList.add("selected");
+        if (element) {
+          element.classList.add("selected");
+        } else {
+          const target = document.querySelector(
+            `.card[data-id="${memoId}"], #card-${memoId}`,
+          );
+          if (target) target.classList.add("selected");
+        }
       }
 
       function contextAction(type) {
@@ -1450,25 +1505,19 @@
               pos_y: (target.pos_y || 100) + 30,
             });
           }
-        } else if (type === "lock" && activeSelectedMemoId) {
-          const target = document.querySelector(
-            `#card-${activeSelectedMemoId}`,
-          );
-          if (target) target.classList.toggle("locked");
-        } else if (type === "paste") {
-          if (!clipboardData) return alert("복사된 대본이 없습니다.");
-          socket.emit("memo:save", {
-            board_id: currentBoardId,
-            title: `${clipboardData.title} (복사본)`,
-            category: clipboardData.category,
-            status: clipboardData.status,
-            script: clipboardData.script,
-            rich_content: clipboardData.rich_content,
-            author: currentUser.name,
-          });
-        } else if (type === "delete" && activeSelectedMemoId) {
-          deleteMemo(activeSelectedMemoId);
-          activeSelectedMemoId = null;
+        } else if (type === "lock" && activeSelectedElement) {
+          activeSelectedElement.classList.toggle("locked");
+        } else if (type === "delete") {
+          if (
+            activeSelectedElement &&
+            activeSelectedElement.classList.contains("sticky-note")
+          ) {
+            activeSelectedElement.remove();
+            activeSelectedElement = null;
+          } else if (activeSelectedMemoId) {
+            deleteMemo(activeSelectedMemoId);
+            activeSelectedMemoId = null;
+          }
         }
       }
 
@@ -1615,7 +1664,6 @@
         else renderCanvas(memos);
       }
 
-      // 🎬 칸에 영향 받지 않고 떠오르는 영상 미리보기 탑재 칸반
       function renderKanban(memos) {
         ["아이디어", "대본작성", "촬영예정", "완료"].forEach((status) => {
           document.getElementById(`col-${status}`).innerHTML = "";
@@ -1635,6 +1683,7 @@
           card.tabIndex = 0;
           card.onclick = () => {
             activeSelectedMemoId = memo.id;
+            activeSelectedElement = card;
             highlightSelectedCard(memo.id);
           };
 
@@ -1701,40 +1750,15 @@
             <div class="script-box" style="max-height:80px;">${memo.rich_content || memo.script || ""}</div>
           `;
 
-          card.onclick = () => {
+          makeDraggable(card);
+
+          card.onclick = (e) => {
+            e.stopPropagation();
             activeSelectedMemoId = memo.id;
-            highlightSelectedCard(memo.id);
+            activeSelectedElement = card;
+            highlightSelectedCard(memo.id, card);
           };
 
-          let isDraggingCard = false,
-            offsetLeft = 0,
-            offsetTop = 0;
-          card.addEventListener("mousedown", (e) => {
-            if (currentTool !== "select" || card.classList.contains("locked"))
-              return;
-            isDraggingCard = true;
-            offsetLeft = e.clientX - card.offsetLeft;
-            offsetTop = e.clientY - card.offsetTop;
-          });
-
-          window.addEventListener("mousemove", (e) => {
-            if (isDraggingCard && currentTool === "select") {
-              const newX = (e.clientX - offsetLeft) / zoomLevel;
-              const newY = (e.clientY - offsetTop) / zoomLevel;
-              card.style.left = `${newX}px`;
-              card.style.top = `${newY}px`;
-              socket.emit("memo:move", {
-                memoId: memo.id,
-                boardId: currentBoardId,
-                pos_x: newX,
-                pos_y: newY,
-              });
-            }
-          });
-
-          window.addEventListener("mouseup", () => {
-            isDraggingCard = false;
-          });
           container.appendChild(card);
         });
       }
@@ -1932,7 +1956,6 @@
         a.click();
       }
 
-      // 소켓 통신: 피그마 멀티 커서 동기화
       socket.on("cursor:moved", ({ name, x, y }) => {
         let cursorEl = document.getElementById(`cursor-${name}`);
         if (!cursorEl) {
