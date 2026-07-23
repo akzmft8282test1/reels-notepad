@@ -88,6 +88,15 @@ app.post("/api/logout", (req, res) => {
   res.json({ success: true });
 });
 
+// 팀원 유저 목록 조회 (@멘션 자동완성용)
+app.get("/api/users", async (req, res) => {
+  const { data, error } = await supabase
+    .from("allowed_users")
+    .select("username, name");
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // 관리자 계정 추가
 app.post("/api/admin/users", async (req, res) => {
   const { name, username, password, role } = req.body;
@@ -120,7 +129,7 @@ app.post("/api/admin/users", async (req, res) => {
   }
 });
 
-// 게시판 목록 및 생성
+// 게시판 목록 및 생성 (새 게시판 생성 완벽 복구)
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -136,9 +145,14 @@ app.post("/api/boards", async (req, res) => {
   const { name, description } = req.body;
   const { data, error } = await supabase
     .from("boards")
-    .insert([{ name, description }])
+    .insert([{ name, description: description || "" }])
     .select();
   if (error) return res.status(500).json({ error: error.message });
+  await logAction(
+    req.session.user.username,
+    "CREATE_BOARD",
+    `게시판 생성: ${name}`,
+  );
   res.json(data[0]);
 });
 
@@ -223,6 +237,17 @@ app.get("/api/history/:memoId", async (req, res) => {
   res.json(data);
 });
 
+// 활동 로그 조회 API (누구나/관리자 모달 연동)
+app.get("/api/logs", async (req, res) => {
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 app.get("/api/admin/logs", async (req, res) => {
   if (!req.session.user || req.session.user.role !== "Admin")
     return res.status(403).json({ message: "권한이 없습니다." });
@@ -303,12 +328,14 @@ io.on("connection", (socket) => {
   socket.on("cursor:move", (pos) => {
     const userInfo = activeUsers.get(socket.id);
     if (userInfo && userInfo.boardId) {
-      socket.to(userInfo.boardId).emit("cursor:update", {
-        socketId: socket.id,
-        name: userInfo.name,
-        x: pos.x,
-        y: pos.y,
-      });
+      socket
+        .to(userInfo.boardId)
+        .emit("cursor:update", {
+          socketId: socket.id,
+          name: userInfo.name,
+          x: pos.x,
+          y: pos.y,
+        });
     }
   });
 
@@ -325,13 +352,15 @@ io.on("connection", (socket) => {
         .eq("id", memoData.id)
         .single();
       if (oldMemo && oldMemo.script !== memoData.script) {
-        await supabase.from("script_history").insert([
-          {
-            memo_id: memoData.id,
-            script: oldMemo.script,
-            edited_by: user?.name || "익명",
-          },
-        ]);
+        await supabase
+          .from("script_history")
+          .insert([
+            {
+              memo_id: memoData.id,
+              script: oldMemo.script,
+              edited_by: user?.name || "익명",
+            },
+          ]);
       }
       const { data } = await supabase
         .from("memos")
@@ -438,7 +467,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(
-    `🎬 원본+캔버스 완벽 통합 서버 실행 중: http://localhost:${PORT}`,
-  );
+  console.log(`🎬 피그마/칸반 다기능 협업 노트패드: http://localhost:${PORT}`);
 });
