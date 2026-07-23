@@ -13,9 +13,6 @@
     />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
-    <!-- Fabric.js 패키지 -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
-
     <style>
       :root {
         --primary: #e1306c;
@@ -104,8 +101,8 @@
       }
       .card.selected,
       .canvas-card.selected {
-        border: 2px solid var(--primary);
-        box-shadow: 0 0 10px rgba(225, 48, 108, 0.4);
+        border: 2px solid var(--primary) !important;
+        box-shadow: 0 0 12px rgba(225, 48, 108, 0.5);
       }
       .card.pinned {
         border: 2px solid var(--primary);
@@ -130,7 +127,7 @@
         white-space: pre-wrap;
       }
 
-      /* 무한 캔버스 전용 뷰포트 */
+      /* 동적 확장 무한 캔버스 뷰포트 */
       #canvasView {
         display: none;
         width: 100vw;
@@ -139,8 +136,8 @@
         position: relative;
       }
       #canvasContainer {
-        width: 6000px;
-        height: 6000px;
+        width: 3000px;
+        height: 3000px; /* 초기 크기 (매초 가로세로 1000px씩 증가) */
         background-color: var(--canvas-bg);
         background-image: radial-gradient(
           var(--grid-color) 1.5px,
@@ -152,8 +149,8 @@
         left: 0;
         transform-origin: 0 0;
       }
-      .canvas-container {
-        position: absolute !important;
+      #paintCanvas {
+        position: absolute;
         top: 0;
         left: 0;
         z-index: 1;
@@ -173,7 +170,7 @@
         outline: none;
       }
 
-      /* 커스텀 우클릭 컨텍스트 메뉴 */
+      /* 우클릭 컨텍스트 메뉴 */
       #contextMenu {
         display: none;
         position: fixed;
@@ -183,7 +180,7 @@
         border-radius: 8px;
         box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
         z-index: 9999;
-        min-width: 150px;
+        min-width: 160px;
         padding: 6px 0;
       }
       #contextMenu div {
@@ -198,32 +195,7 @@
         color: #fff;
       }
 
-      /* 댓글 `@` 멘션 드롭다운 */
-      #mentionDropdown {
-        display: none;
-        position: absolute;
-        background: #fff;
-        color: #000;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        max-height: 120px;
-        overflow-y: auto;
-        z-index: 3000;
-        width: 160px;
-        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-      }
-      #mentionDropdown div {
-        padding: 6px 10px;
-        font-size: 0.8rem;
-        cursor: pointer;
-      }
-      #mentionDropdown div:hover {
-        background: #ffe6ed;
-        color: var(--primary);
-        font-weight: bold;
-      }
-
-      /* 툴바 커스텀 스타일 */
+      /* 툴바 커스텀 */
       .tool-btn.active {
         background: var(--primary) !important;
         color: white !important;
@@ -302,21 +274,6 @@
         font-weight: bold;
         border: none;
         cursor: pointer;
-      }
-
-      #adminConsole {
-        display: none;
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 420px;
-        background: #1e1e1e;
-        color: #00ff66;
-        padding: 20px;
-        border-radius: 10px;
-        z-index: 3000;
-        font-family: monospace;
       }
     </style>
   </head>
@@ -471,9 +428,8 @@
       </div>
     </div>
 
-    <!-- 2. 무한 캔버스 뷰 -->
+    <!-- 2. 동적 무한 캔버스 뷰 -->
     <div id="canvasView">
-      <!-- 캔버스 모드 조작 툴바 -->
       <div
         style="
           position: absolute;
@@ -526,8 +482,18 @@
           id="penColor"
           value="#e1306c"
           style="width: 28px; height: 24px; border: none; cursor: pointer"
-          onchange="updatePenColor()"
         />
+        <span
+          id="canvasSizeInfo"
+          style="
+            font-size: 0.75rem;
+            align-self: center;
+            font-family: monospace;
+            margin-left: 6px;
+            color: #555;
+          "
+          >크기: 3000x3000px</span
+        >
         <button
           style="width: auto; padding: 4px 8px; background: #e74c3c"
           onclick="clearDrawings()"
@@ -536,11 +502,12 @@
         </button>
       </div>
       <div id="canvasContainer">
-        <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
+        <!-- 2D HTML5 캔버스 엔진 -->
+        <canvas id="paintCanvas" width="3000" height="3000"></canvas>
       </div>
     </div>
 
-    <!-- 우클릭 컨텍스트 메뉴 -->
+    <!-- 보장된 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
       <div onclick="contextAction('cut')">
         <span>✂️ 잘라내기</span><small style="opacity: 0.6">Ctrl+X</small>
@@ -575,15 +542,6 @@
           <option value="완료">✅ 완료</option>
         </select>
 
-        <label>인스타 릴스 / 유튜브 URL (미리보기 지원)</label>
-        <input type="text" id="editVideoUrl" placeholder="https://..." />
-
-        <label>BGM 음원명 및 링크</label>
-        <div style="display: flex; gap: 5px">
-          <input type="text" id="editBgmTitle" placeholder="음원명" />
-          <input type="text" id="editBgmUrl" placeholder="링크 (URL)" />
-        </div>
-
         <label>대본 (서식 편집 지원)</label>
         <div
           id="quillEditor"
@@ -596,42 +554,6 @@
             취소
           </button>
         </div>
-      </div>
-    </div>
-
-    <!-- 댓글 모달 -->
-    <div id="commentModal" class="modal-bg">
-      <div class="modal" style="position: relative">
-        <h3>💬 아이디어 토론 댓글</h3>
-        <div
-          id="commentList"
-          style="
-            max-height: 200px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            border: 1px solid var(--border);
-            padding: 8px;
-            border-radius: 6px;
-          "
-        ></div>
-
-        <div id="mentionDropdown"></div>
-
-        <textarea
-          id="newCommentText"
-          placeholder="댓글 입력 (@ 입력 시 팀원 자동완성)"
-          rows="2"
-          oninput="handleMentionInput(this)"
-        ></textarea>
-        <button onclick="submitComment()" style="margin-top: 6px">
-          댓글 작성
-        </button>
-        <button
-          style="background: #666; margin-top: 5px"
-          onclick="closeModal('commentModal')"
-        >
-          닫기
-        </button>
       </div>
     </div>
 
@@ -659,177 +581,122 @@
       </div>
     </div>
 
-    <!-- 9:16 미리보기 모달 -->
-    <div id="reelsModal" class="modal-bg">
-      <div class="modal" style="background: transparent; box-shadow: none">
-        <div class="reels-phone-frame">
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              font-size: 0.8rem;
-            "
-          >
-            <span id="reelsPreviewTitle">릴스 미리보기</span>
-            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
-              >✕</span
-            >
-          </div>
-          <div
-            style="
-              text-align: center;
-              padding: 20px;
-              font-size: 1.1rem;
-              font-weight: bold;
-              background: rgba(0, 0, 0, 0.6);
-              border-radius: 10px;
-            "
-            id="reelsPreviewScript"
-          >
-            자막이 여기에 표시됩니다.
-          </div>
-          <div style="font-size: 0.8rem">
-            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 히스토리 모달 -->
-    <div id="historyModal" class="modal-bg">
-      <div class="modal">
-        <h3>📜 대본 변경 이력 (History)</h3>
-        <div id="historyList" style="max-height: 250px; overflow-y: auto"></div>
-        <button
-          style="background: #666; margin-top: 10px"
-          onclick="closeModal('historyModal')"
-        >
-          닫기
-        </button>
-      </div>
-    </div>
-
-    <!-- 휴지통 모달 -->
-    <div id="trashModal" class="modal-bg">
-      <div class="modal">
-        <h3>🗑️ 휴지통 (60일 보관)</h3>
-        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
-        <button
-          style="background: #666; margin-top: 10px"
-          onclick="closeModal('trashModal')"
-        >
-          닫기
-        </button>
-      </div>
-    </div>
-
-    <!-- 어드민 콘솔 -->
-    <div id="adminConsole">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <h3 style="margin: 0">⚡ ADMIN CONSOLE</h3>
-        <span style="cursor: pointer" onclick="closeAdminConsole()">✕</span>
-      </div>
-      <p style="font-size: 0.8rem">신규 팀원 생성 및 활동 로그</p>
-      <input type="text" id="adminNewName" placeholder="닉네임" />
-      <input type="text" id="adminNewUsername" placeholder="아이디" />
-      <input type="password" id="adminNewPassword" placeholder="비밀번호" />
-      <select id="adminNewRole">
-        <option value="Member">Member</option>
-        <option value="Admin">Admin</option>
-        <option value="Viewer">Viewer</option>
-      </select>
-      <button onclick="addNewUser()">계정 추가하기</button>
-      <hr style="margin: 15px 0; border-color: #444" />
-      <button
-        style="background: #333; color: #00ff66"
-        onclick="loadAuditLogs()"
-      >
-        📜 활동 로그 조회
-      </button>
-      <div
-        id="auditLogBox"
-        style="
-          font-size: 0.75rem;
-          max-height: 120px;
-          overflow-y: auto;
-          margin-top: 8px;
-        "
-      ></div>
-    </div>
-
     <script>
       const socket = io();
       let currentUser = null;
       let currentBoardId = null;
-      let selectedMemoForComment = null;
       let activeSelectedMemoId = null;
       let clipboardData = null;
-      let fCanvas = null;
       let quill = null;
       let activeView = "kanban";
-      let currentTool = "pan"; // 기본 툴: pan (캔버스 이동)
+      let currentTool = "pan";
       let memosCache = {};
-      let teamMembers = [];
 
-      // 무한 캔버스 Pan 좌표 관련
+      // 캔버스 크기 및 드로잉 변수
+      let canvasWidth = 3000;
+      let canvasHeight = 3000;
+      let pCanvas = null;
+      let ctx = null;
+      let isDrawing = false;
+      let lastX = 0,
+        lastY = 0;
+
+      // Pan 좌표
       let isPanning = false;
       let panStart = { x: 0, y: 0 };
       let canvasPos = { x: 0, y: 0 };
 
-      function getEmbedUrl(url) {
-        if (!url) return null;
-        const ytMatch = url.match(
-          /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
-        );
-        if (ytMatch && ytMatch[1])
-          return `https://www.youtube.com/embed/${ytMatch[1]}`;
-        const instaMatch = url.match(
-          /instagram\.com\/(?:p|reel|reels)\/([^/?#&]+)/,
-        );
-        if (instaMatch && instaMatch[1])
-          return `https://www.instagram.com/p/${instaMatch[1]}/embed`;
-        return null;
-      }
-
       window.onload = () => {
-        quill = new Quill("#quillEditor", {
-          theme: "snow",
-          modules: {
-            toolbar: [["bold", "italic", "underline"], [{ color: [] }]],
-          },
+        quill = new Quill("#quillEditor", { theme: "snow" });
+
+        pCanvas = document.getElementById("paintCanvas");
+        ctx = pCanvas.getContext("2d");
+
+        // 1초에 가로세로 1000px씩 무한 확장 타이머
+        setInterval(() => {
+          if (activeView === "canvas") {
+            canvasWidth += 1000;
+            canvasHeight += 1000;
+
+            const container = document.getElementById("canvasContainer");
+            container.style.width = `${canvasWidth}px`;
+            container.style.height = `${canvasHeight}px`;
+
+            // 기존 그린 그림 백업 후 크기 확장
+            const imgData = ctx.getImageData(
+              0,
+              0,
+              pCanvas.width,
+              pCanvas.height,
+            );
+            pCanvas.width = canvasWidth;
+            pCanvas.height = canvasHeight;
+            ctx.putImageData(imgData, 0, 0);
+
+            document.getElementById("canvasSizeInfo").innerText =
+              `크기: ${canvasWidth}x${canvasHeight}px`;
+          }
+        }, 1000);
+
+        // HTML5 Canvas 직접 지우개/펜 드로잉 로직
+        pCanvas.addEventListener("mousedown", (e) => {
+          if (currentTool !== "pen" && currentTool !== "eraser") return;
+          isDrawing = true;
+          const rect = pCanvas.getBoundingClientRect();
+          lastX = e.clientX - rect.left;
+          lastY = e.clientY - rect.top;
         });
 
-        fCanvas = new fabric.Canvas("fabricCanvas", {
-          isDrawingMode: false,
-          selection: true,
-        });
-        fCanvas.freeDrawingBrush.width = 3;
-        fCanvas.freeDrawingBrush.color =
-          document.getElementById("penColor").value;
+        pCanvas.addEventListener("mousemove", (e) => {
+          if (!isDrawing) return;
+          const rect = pCanvas.getBoundingClientRect();
+          const currentX = e.clientX - rect.left;
+          const currentY = e.clientY - rect.top;
 
-        fCanvas.on("path:created", (e) => {
-          socket.emit("drawing:path", {
+          ctx.beginPath();
+          ctx.moveTo(lastX, lastY);
+          ctx.lineTo(currentX, currentY);
+
+          if (currentTool === "eraser") {
+            // ★ 진짜 지우개: 그려진 펜 선만 부분 투명하게 지움
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.lineWidth = 25;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          } else if (currentTool === "pen") {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = document.getElementById("penColor").value;
+            ctx.lineWidth = 4;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          }
+
+          socket.emit("drawing:stroke", {
             boardId: currentBoardId,
-            svgPath: e.path.toSVG(),
+            strokeData: {
+              tool: currentTool,
+              x1: lastX,
+              y1: lastY,
+              x2: currentX,
+              y2: currentY,
+              color: document.getElementById("penColor").value,
+            },
           });
+
+          lastX = currentX;
+          lastY = currentY;
         });
 
-        // 무한 캔버스 이동(Pan) 이벤트 핸들러
+        window.addEventListener("mouseup", () => {
+          isDrawing = false;
+        });
+
+        // Pan(캔버스 이동) 이벤트
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
         canvasView.addEventListener("mousedown", (e) => {
-          if (
-            currentTool === "pan" &&
-            e.target.closest("#canvasView") &&
-            !e.target.closest(".canvas-card")
-          ) {
+          if (currentTool === "pan" && !e.target.closest(".canvas-card")) {
             isPanning = true;
             panStart = {
               x: e.clientX - canvasPos.x,
@@ -854,35 +721,29 @@
           }
         });
 
-        // 우클릭 컨텍스트 메뉴 이벤트
+        // 보장된 우클릭 컨텍스트 메뉴 이벤트
         window.addEventListener("contextmenu", (e) => {
+          e.preventDefault(); // 기본 브라우저 우클릭 강제 차단
+
           const cardEl = e.target.closest(".card, .canvas-card");
           const contextMenu = document.getElementById("contextMenu");
 
           if (cardEl) {
-            e.preventDefault();
             activeSelectedMemoId =
               cardEl.dataset.id || cardEl.id.replace("card-", "");
             highlightSelectedCard(activeSelectedMemoId);
-
-            contextMenu.style.left = `${e.clientX}px`;
-            contextMenu.style.top = `${e.clientY}px`;
-            contextMenu.style.display = "block";
-          } else if (fCanvas.getActiveObject()) {
-            e.preventDefault();
-            contextMenu.style.left = `${e.clientX}px`;
-            contextMenu.style.top = `${e.clientY}px`;
-            contextMenu.style.display = "block";
-          } else {
-            contextMenu.style.display = "none";
           }
+
+          contextMenu.style.left = `${e.clientX}px`;
+          contextMenu.style.top = `${e.clientY}px`;
+          contextMenu.style.display = "block";
         });
 
         window.addEventListener("click", () => {
           document.getElementById("contextMenu").style.display = "none";
         });
 
-        // 키보드 Delete 키 삭제
+        // Delete 키 선택 삭제 이벤트
         window.addEventListener("keydown", (e) => {
           const activeTag = document.activeElement
             ? document.activeElement.tagName.toLowerCase()
@@ -894,15 +755,13 @@
 
           if (isEditingText) return;
 
-          if (e.key === "Delete" || e.key === "Backspace") {
-            if (activeSelectedMemoId) {
-              e.preventDefault();
-              deleteMemo(activeSelectedMemoId);
-              activeSelectedMemoId = null;
-            } else if (fCanvas && fCanvas.getActiveObject()) {
-              e.preventDefault();
-              fCanvas.remove(fCanvas.getActiveObject());
-            }
+          if (
+            (e.key === "Delete" || e.key === "Backspace") &&
+            activeSelectedMemoId
+          ) {
+            e.preventDefault();
+            deleteMemo(activeSelectedMemoId);
+            activeSelectedMemoId = null;
           }
         });
 
@@ -917,11 +776,9 @@
           document.getElementById("loginView").style.display = "none";
           switchView("kanban");
           loadBoards();
-          loadTeamMembers();
         }
       }
 
-      // 모드 선택 분리 (Pan / Select / Pen / Eraser)
       function setTool(tool) {
         currentTool = tool;
         document
@@ -931,31 +788,15 @@
 
         if (tool === "pan") {
           document.getElementById("btnPan").classList.add("active");
-          fCanvas.isDrawingMode = false;
-          fCanvas.selection = false;
           canvasView.style.cursor = "grab";
         } else if (tool === "select") {
           document.getElementById("btnSelect").classList.add("active");
-          fCanvas.isDrawingMode = false;
-          fCanvas.selection = true;
           canvasView.style.cursor = "default";
         } else if (tool === "pen") {
           document.getElementById("btnPen").classList.add("active");
-          fCanvas.isDrawingMode = true;
-          fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
-          fCanvas.freeDrawingBrush.width = 3;
-          fCanvas.freeDrawingBrush.color =
-            document.getElementById("penColor").value;
           canvasView.style.cursor = "crosshair";
         } else if (tool === "eraser") {
           document.getElementById("btnEraser").classList.add("active");
-          fCanvas.isDrawingMode = true;
-          fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
-          fCanvas.freeDrawingBrush.width = 20;
-          fCanvas.freeDrawingBrush.strokeLineCap = "round";
-          fCanvas.freeDrawingBrush.strokeLineJoin = "round";
-          fCanvas.freeDrawingBrush.color = "rgba(0,0,0,1)";
-          fCanvas.contextTop.globalCompositeOperation = "destination-out";
           canvasView.style.cursor = "cell";
         }
       }
@@ -978,7 +819,7 @@
           clipboardData = memosCache[activeSelectedMemoId];
           deleteMemo(activeSelectedMemoId);
           activeSelectedMemoId = null;
-          alert("대본이 잘라내기 되었습니다.");
+          alert("대본이 잘라내기 처리 되었습니다.");
         } else if (type === "paste") {
           if (!clipboardData) return alert("복사된 대본이 없습니다.");
           socket.emit("memo:save", {
@@ -990,13 +831,9 @@
             rich_content: clipboardData.rich_content,
             author: currentUser.name,
           });
-        } else if (type === "delete") {
-          if (activeSelectedMemoId) {
-            deleteMemo(activeSelectedMemoId);
-            activeSelectedMemoId = null;
-          } else if (fCanvas.getActiveObject()) {
-            fCanvas.remove(fCanvas.getActiveObject());
-          }
+        } else if (type === "delete" && activeSelectedMemoId) {
+          deleteMemo(activeSelectedMemoId);
+          activeSelectedMemoId = null;
         }
       }
 
@@ -1013,58 +850,9 @@
 
         if (res.ok) {
           nameInput.value = "";
-          alert("새 게시판이 추가되었습니다!");
+          alert("새 게시판이 생성되었습니다!");
           loadBoards();
-        } else {
-          alert("게시판 생성 실패");
         }
-      }
-
-      async function loadTeamMembers() {
-        const res = await fetch("/api/users");
-        teamMembers = await res.json();
-      }
-
-      function handleMentionInput(textarea) {
-        const val = textarea.value;
-        const cursor = textarea.selectionStart;
-        const lastAt = val.lastIndexOf("@", cursor);
-        const dropdown = document.getElementById("mentionDropdown");
-
-        if (lastAt !== -1 && lastAt < cursor) {
-          const query = val.slice(lastAt + 1, cursor).toLowerCase();
-          const matches = teamMembers.filter(
-            (m) =>
-              m.name.toLowerCase().includes(query) ||
-              m.username.toLowerCase().includes(query),
-          );
-
-          if (matches.length > 0) {
-            dropdown.innerHTML = matches
-              .map(
-                (m) => `
-              <div onclick="selectMention('${m.name}', ${lastAt})">@${m.name} (${m.username})</div>
-            `,
-              )
-              .join("");
-            dropdown.style.left = `${textarea.offsetLeft + 10}px`;
-            dropdown.style.top = `${textarea.offsetTop - 80}px`;
-            dropdown.style.display = "block";
-            return;
-          }
-        }
-        dropdown.style.display = "none";
-      }
-
-      function selectMention(name, lastAtIndex) {
-        const textarea = document.getElementById("newCommentText");
-        const val = textarea.value;
-        textarea.value =
-          val.slice(0, lastAtIndex) +
-          `@${name} ` +
-          val.slice(textarea.selectionStart);
-        document.getElementById("mentionDropdown").style.display = "none";
-        textarea.focus();
       }
 
       function switchView(view) {
@@ -1080,15 +868,11 @@
         if (currentBoardId) loadMemos();
       }
 
-      function updatePenColor() {
-        if (fCanvas && fCanvas.freeDrawingBrush)
-          fCanvas.freeDrawingBrush.color =
-            document.getElementById("penColor").value;
-      }
-
       function clearDrawings() {
-        if (confirm("캔버스의 모든 드로잉을 지우시겠습니까?"))
+        if (confirm("모든 그림을 지우시겠습니까?")) {
+          ctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
           socket.emit("drawing:clear", currentBoardId);
+        }
       }
 
       function toggleDarkMode() {
@@ -1158,57 +942,26 @@
 
         memos.forEach((memo) => {
           memosCache[memo.id] = memo;
-          const estSeconds = Math.ceil((memo.script || "").length / 6);
           const colEl =
             document.getElementById(`col-${memo.status}`) ||
             document.getElementById("col-아이디어");
-          const embedUrl = getEmbedUrl(memo.video_url);
 
           const card = document.createElement("div");
           card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
           card.dataset.id = memo.id;
           card.tabIndex = 0;
-          card.draggable = currentUser.role !== "Viewer";
-          card.ondragstart = (e) =>
-            e.dataTransfer.setData("text/plain", memo.id);
           card.onclick = () => {
             activeSelectedMemoId = memo.id;
             highlightSelectedCard(memo.id);
           };
 
           card.innerHTML = `
-            ${memo.is_pinned ? '📌 <b style="color:var(--primary); font-size:0.75rem;">고정됨</b><br>' : ""}
             <span class="badge">${memo.category || "일반"}</span>
             <h4 style="margin:6px 0;">${memo.title}</h4>
             <div class="script-box">${memo.rich_content || memo.script || "대본 없음"}</div>
-            <div style="font-size:0.75rem; color:#2b8a3e; margin-top:4px;">⏱️ 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
-            
-            ${
-              memo.video_url
-                ? `
-              <div class="video-preview-wrapper">
-                <div class="video-preview-btn">▶️ 영상 미리보기 (호버)</div>
-                <div class="video-preview-popup">
-                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:15px;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[바로가기]</a></div>`}
-                </div>
-              </div>
-            `
-                : ""
-            }
-
-            <div style="display:flex; gap:4px; margin-top:8px;">
-              <button style="font-size:0.7rem; padding:2px 6px;" onclick="openReelsModal('${memo.title}', \`${memo.script}\`, '${memo.bgm_title}')">📱 9:16뷰어</button>
-              <button style="font-size:0.7rem; padding:2px 6px; background:#4a90e2;" onclick="openCommentModal('${memo.id}')">💬 댓글</button>
-              <button style="font-size:0.7rem; padding:2px 6px; background:#7f8c8d;" onclick="openHistoryModal('${memo.id}')">📜 히스토리</button>
-              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
-            </div>
-
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.75rem; color:#888;">
               <span>✍️ ${memo.author}</span>
-              <div>
-                <button style="width:auto; padding:2px 6px;" onclick="likeMemo('${memo.id}')">❤️ ${memo.likes || 0}</button>
-                <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
-              </div>
+              <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
             </div>
           `;
           colEl.appendChild(card);
@@ -1236,7 +989,6 @@
             </div>
             <h4 style="margin:4px 0;">${memo.title}</h4>
             <div class="script-box" style="max-height:80px;">${memo.rich_content || memo.script || ""}</div>
-            <button style="font-size:0.65rem; margin-top:6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 편집</button>
           `;
 
           card.onclick = () => {
@@ -1248,8 +1000,7 @@
             offsetLeft = 0,
             offsetTop = 0;
           card.addEventListener("mousedown", (e) => {
-            if (currentTool !== "select" || e.target.tagName === "BUTTON")
-              return;
+            if (currentTool !== "select") return;
             isDraggingCard = true;
             offsetLeft = e.clientX - card.offsetLeft;
             offsetTop = e.clientY - card.offsetTop;
@@ -1277,190 +1028,48 @@
         });
       }
 
-      function allowDrop(ev) {
-        ev.preventDefault();
-      }
-      async function drop(ev, newStatus) {
-        ev.preventDefault();
-        const memoId = ev.dataTransfer.getData("text/plain");
-        if (!memoId) return;
-        await fetch("/api/memos/status", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memoId, status: newStatus }),
-        });
-      }
-
       function openMemoEditModal() {
-        document.getElementById("editMemoId").value = "";
-        document.getElementById("editTitle").value = "";
-        document.getElementById("editCategory").value = "";
-        quill.clipboard.dangerouslyPasteHTML("[후킹]: \n[본문]: \n[CTA]: ");
         document.getElementById("memoModal").style.display = "flex";
       }
-
-      function editMemo(memoId) {
-        const memo = memosCache[memoId];
-        if (!memo) return;
-        document.getElementById("editMemoId").value = memo.id;
-        document.getElementById("editTitle").value = memo.title;
-        document.getElementById("editCategory").value = memo.category || "";
-        document.getElementById("editVideoUrl").value = memo.video_url || "";
-        quill.clipboard.dangerouslyPasteHTML(
-          memo.rich_content || memo.script || "",
-        );
-        document.getElementById("memoModal").style.display = "flex";
-      }
-
       function saveMemoModal() {
-        const id = document.getElementById("editMemoId").value;
         const memoData = {
-          id: id || undefined,
           board_id: currentBoardId,
           title: document.getElementById("editTitle").value || "무제 아이디어",
           category: document.getElementById("editCategory").value || "#일반",
           status: document.getElementById("editStatus").value,
-          video_url: document.getElementById("editVideoUrl").value,
           rich_content: quill.root.innerHTML,
           script: quill.getText(),
           author: currentUser.name,
         };
-
         socket.emit("memo:save", memoData);
         closeModal("memoModal");
       }
 
-      function openReelsModal(title, script, bgm) {
-        document.getElementById("reelsPreviewTitle").innerText = title;
-        document.getElementById("reelsPreviewScript").innerText =
-          script || "대본이 없습니다.";
-        document.getElementById("reelsModal").style.display = "flex";
-      }
-
-      async function openCommentModal(memoId) {
-        selectedMemoForComment = memoId;
-        const res = await fetch(`/api/comments/${memoId}`);
-        const comments = await res.json();
-        const box = document.getElementById("commentList");
-        box.innerHTML = comments
-          .map(
-            (c) => `
-          <div style="font-size:0.8rem; margin-bottom:6px;">
-            <b>${c.author}:</b> ${c.content} <span style="color:#aaa; font-size:0.7rem;">(${new Date(c.created_at).toLocaleTimeString()})</span>
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("commentModal").style.display = "flex";
-      }
-
-      function submitComment() {
-        const text = document.getElementById("newCommentText").value;
-        if (!text) return;
-        socket.emit("comment:add", {
-          memoId: selectedMemoForComment,
-          boardId: currentBoardId,
-          content: text,
-        });
-        document.getElementById("newCommentText").value = "";
-        closeModal("commentModal");
-      }
-
-      async function openAuditLogsModal() {
-        const res = await fetch("/api/logs");
-        const logs = await res.json();
-        document.getElementById("auditLogModalBox").innerHTML = logs
-          .map(
-            (l) => `
-          <div style="margin-bottom:6px; border-bottom:1px solid #eee; padding-bottom:4px;">
-            <b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("auditLogModal").style.display = "flex";
-      }
-
-      async function openHistoryModal(memoId) {
-        const res = await fetch(`/api/history/${memoId}`);
-        const logs = await res.json();
-        const box = document.getElementById("historyList");
-        box.innerHTML = logs
-          .map(
-            (l) => `
-          <div style="font-size:0.8rem; border-bottom:1px solid #ccc; padding:6px 0;">
-            <div>✍️ <b>${l.edited_by}</b> (${new Date(l.created_at).toLocaleString()})</div>
-            <pre style="background:#eee; padding:4px;">${l.script}</pre>
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("historyModal").style.display = "flex";
-      }
-
-      async function toggleTrashModal() {
-        const res = await fetch(`/api/trash/${currentBoardId}`);
-        const trashMemos = await res.json();
-        const box = document.getElementById("trashList");
-        box.innerHTML = trashMemos
-          .map(
-            (t) => `
-          <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-bottom:6px;">
-            <span>${t.title} (삭제일: ${new Date(t.deleted_at).toLocaleDateString()})</span>
-            <button style="width:auto; padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button>
-          </div>
-        `,
-          )
-          .join("");
-        document.getElementById("trashModal").style.display = "flex";
-      }
-
-      async function restoreMemo(memoId) {
-        await fetch("/api/memos/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memoId }),
-        });
-        closeModal("trashModal");
-        loadMemos();
-      }
-
       function deleteMemo(memoId) {
-        if (confirm("이 메모를 휴지통으로 이동하시겠습니까?")) {
+        if (confirm("이 메모를 삭제하시겠습니까?")) {
           socket.emit("memo:delete", { memoId, boardId: currentBoardId });
         }
       }
 
-      function likeMemo(memoId) {
-        socket.emit("memo:like", { memoId, boardId: currentBoardId });
-      }
-
-      async function exportTXT() {
-        const res = await fetch(`/api/memos/${currentBoardId}`);
-        const memos = await res.json();
-        let content = `🎬 [릴스 대본 집합]\n\n`;
-        memos.forEach((m, i) => {
-          content += `============== ${i + 1}. ${m.title} ==============\n대본:\n${m.script}\n\n`;
-        });
-        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `reels_scripts_${Date.now()}.txt`;
-        a.click();
-      }
-
-      socket.on("presence:update", (users) => {
-        document.getElementById("onlineCount").innerText =
-          `접속자: ${users.length}명`;
-      });
       socket.on("memo:updated", () => loadMemos());
-      socket.on("memo:liked", () => loadMemos());
-      socket.on("drawing:path", ({ svgPath }) => {
-        fabric.loadSVGFromString(svgPath, (objects, options) => {
-          fCanvas.add(fabric.util.groupSVGElements(objects, options));
-          fCanvas.renderAll();
-        });
+      socket.on("drawing:stroke", (s) => {
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        if (s.tool === "eraser") {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.lineWidth = 25;
+        } else {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 4;
+        }
+        ctx.lineCap = "round";
+        ctx.stroke();
       });
+      socket.on("drawing:cleared", () =>
+        ctx.clearRect(0, 0, pCanvas.width, pCanvas.height),
+      );
     </script>
   </body>
 </html>
