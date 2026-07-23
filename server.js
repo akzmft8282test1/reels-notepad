@@ -129,7 +129,7 @@ app.post("/api/admin/users", async (req, res) => {
   }
 });
 
-// 게시판 목록 및 생성 (새 게시판 생성 완벽 복구)
+// 게시판 목록 및 생성
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -237,7 +237,7 @@ app.get("/api/history/:memoId", async (req, res) => {
   res.json(data);
 });
 
-// 활동 로그 조회 API (누구나/관리자 모달 연동)
+// 활동 로그 조회 API
 app.get("/api/logs", async (req, res) => {
   const { data, error } = await supabase
     .from("audit_logs")
@@ -260,7 +260,7 @@ app.get("/api/admin/logs", async (req, res) => {
   res.json(data);
 });
 
-// 캔버스 연동 API (연결선, 드로잉, 음성채널)
+// 캔버스 연동 API
 app.get("/api/connections/:boardId", async (req, res) => {
   const { data, error } = await supabase
     .from("memo_connections")
@@ -277,26 +277,6 @@ app.get("/api/drawings/:boardId", async (req, res) => {
     .eq("board_id", req.params.boardId);
   if (error) return res.status(500).json({ error: error.message });
   res.json(data);
-});
-
-app.get("/api/voice-channels/:boardId", async (req, res) => {
-  const { data, error } = await supabase
-    .from("voice_channels")
-    .select("*")
-    .eq("board_id", req.params.boardId);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
-app.post("/api/voice-channels", async (req, res) => {
-  const { board_id, name, max_users } = req.body;
-  const { data, error } = await supabase
-    .from("voice_channels")
-    .insert([{ board_id, name, max_users: parseInt(max_users) || 4 }])
-    .select();
-  if (error) return res.status(500).json({ error: error.message });
-  io.to(board_id).emit("voice:channel_created", data[0]);
-  res.json(data[0]);
 });
 
 // --- Socket.io 실시간 통신 ---
@@ -428,7 +408,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 캔버스 동기화 이벤트
   socket.on("memo:move", async ({ memoId, boardId, pos_x, pos_y }) => {
     if (user?.role === "Viewer") return;
     await supabase.from("memos").update({ pos_x, pos_y }).eq("id", memoId);
@@ -449,15 +428,6 @@ io.on("connection", (socket) => {
     io.to(boardId).emit("drawing:cleared");
   });
 
-  socket.on("connection:create", async ({ boardId, fromId, toId }) => {
-    if (user?.role === "Viewer") return;
-    const { data } = await supabase
-      .from("memo_connections")
-      .insert([{ board_id: boardId, from_memo_id: fromId, to_memo_id: toId }])
-      .select();
-    if (data) io.to(boardId).emit("connection:created", data[0]);
-  });
-
   socket.on("disconnect", () => {
     io.emit("cursor:remove", socket.id);
     activeUsers.delete(socket.id);
@@ -467,5 +437,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎬 피그마/칸반 다기능 협업 노트패드: http://localhost:${PORT}`);
+  console.log(`🎬 피그마/칸반 협업 스튜디오 실행 중: http://localhost:${PORT}`);
 });

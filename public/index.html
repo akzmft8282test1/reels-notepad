@@ -131,7 +131,7 @@
         display: none;
       }
 
-      /* 무한 캔버스 전용 뷰포트 (다크모드 완벽 연동) */
+      /* 무한 캔버스 전용 뷰포트 */
       #canvasView {
         display: none;
         width: 100vw;
@@ -430,7 +430,6 @@
       </div>
       <ul id="boardList" style="list-style: none; padding: 0"></ul>
       <hr />
-      <!-- 새 게시판 생성 기능 정상화 -->
       <h4>+ 새 게시판 만들기</h4>
       <input type="text" id="newBoardName" placeholder="게시판 이름 입력" />
       <button onclick="createBoard()">게시판 생성</button>
@@ -543,7 +542,6 @@
         >
           🖐️ 선택/이동
         </button>
-        <!-- 지우개 및 펜 기능 -->
         <button style="width: auto; padding: 4px 8px" onclick="setTool('pen')">
           ✏️ 펜
         </button>
@@ -573,8 +571,9 @@
       </div>
     </div>
 
-    <!-- 우클릭 컨텍스트 메뉴 -->
+    <!-- 우클릭 커스텀 컨텍스트 메뉴 (잘라내기/복사/붙여넣기/삭제) -->
     <div id="contextMenu">
+      <div onclick="contextAction('cut')">✂️ 잘라내기</div>
       <div onclick="contextAction('copy')">📋 대본 복사</div>
       <div onclick="contextAction('paste')">📥 대본 붙여넣기</div>
       <div onclick="contextAction('delete')">🗑️ 메모 삭제</div>
@@ -613,10 +612,6 @@
           id="quillEditor"
           style="height: 120px; background: #fff; color: #000; margin-top: 6px"
         ></div>
-        <div id="scriptWarning" class="char-warning">
-          ⚠️ 한 줄에 20자가 넘는 구절이 있습니다! 릴스 자막 가독성이 떨어질 수
-          있습니다.
-        </div>
 
         <div style="display: flex; gap: 10px; margin-top: 15px">
           <button onclick="saveMemoModal()">저장하기</button>
@@ -627,7 +622,7 @@
       </div>
     </div>
 
-    <!-- 댓글 모달 (@멘션 자동완성 적용) -->
+    <!-- 댓글 모달 (@멘션 자동완성) -->
     <div id="commentModal" class="modal-bg">
       <div class="modal" style="position: relative">
         <h3>💬 아이디어 토론 댓글</h3>
@@ -643,7 +638,6 @@
           "
         ></div>
 
-        <!-- 멘션 자동완성 드롭다운 -->
         <div id="mentionDropdown"></div>
 
         <textarea
@@ -664,7 +658,7 @@
       </div>
     </div>
 
-    <!-- 활동 로그 조회 모달 -->
+    <!-- 활동 로그 모달 -->
     <div id="auditLogModal" class="modal-bg">
       <div class="modal">
         <h3>📜 시스템 활동 로그 (Audit Log)</h3>
@@ -843,14 +837,7 @@
           });
         });
 
-        // 지우개 클릭 삭제
-        fCanvas.on("mouse:down", (options) => {
-          if (fCanvas.currentTool === "eraser" && options.target) {
-            fCanvas.remove(options.target);
-          }
-        });
-
-        // 우클릭 컨텍스트 메뉴 바인딩
+        // 우클릭 컨텍스트 메뉴 감지
         document.addEventListener("contextmenu", (e) => {
           const cardEl = e.target.closest(".card, .canvas-card");
           if (cardEl) {
@@ -885,14 +872,63 @@
         }
       }
 
-      // 새 게시판 기능 정상화
+      // 닿은 선 부분만 지워지는 스마트 지우개 브러시 적용
+      function setTool(tool) {
+        if (tool === "pen") {
+          fCanvas.isDrawingMode = true;
+          fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
+          fCanvas.freeDrawingBrush.width = 3;
+          fCanvas.freeDrawingBrush.color =
+            document.getElementById("penColor").value;
+        } else if (tool === "eraser") {
+          fCanvas.isDrawingMode = true;
+          if (fabric.EraserBrush) {
+            fCanvas.freeDrawingBrush = new fabric.EraserBrush(fCanvas);
+            fCanvas.freeDrawingBrush.width = 15;
+          } else {
+            // 하위 호환
+            fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
+            fCanvas.freeDrawingBrush.width = 15;
+            fCanvas.freeDrawingBrush.color = document.body.classList.contains(
+              "dark-mode",
+            )
+              ? "#18181b"
+              : "#f8fafc";
+          }
+        } else {
+          fCanvas.isDrawingMode = false;
+        }
+      }
+
+      // 우클릭 메뉴 동작 (잘라내기, 복사, 붙여넣기, 삭제)
+      function contextAction(type) {
+        if (type === "copy") {
+          clipboardData = memosCache[selectedContextMenuMemoId];
+          alert("대본이 클립보드에 복사되었습니다.");
+        } else if (type === "cut") {
+          clipboardData = memosCache[selectedContextMenuMemoId];
+          deleteMemo(selectedContextMenuMemoId);
+          alert("대본이 잘라내기 되었습니다.");
+        } else if (type === "paste") {
+          if (!clipboardData) return alert("복사된 대본 데이터가 없습니다.");
+          socket.emit("memo:save", {
+            board_id: currentBoardId,
+            title: `${clipboardData.title} (복사본)`,
+            category: clipboardData.category,
+            status: clipboardData.status,
+            script: clipboardData.script,
+            rich_content: clipboardData.rich_content,
+            author: currentUser.name,
+          });
+        } else if (type === "delete") {
+          deleteMemo(selectedContextMenuMemoId);
+        }
+      }
+
       async function createBoard() {
         const nameInput = document.getElementById("newBoardName");
         const name = nameInput.value.trim();
-        if (!name) {
-          alert("게시판 이름을 입력해 주세요.");
-          return;
-        }
+        if (!name) return alert("게시판 이름을 입력해 주세요.");
 
         const res = await fetch("/api/boards", {
           method: "POST",
@@ -902,10 +938,10 @@
 
         if (res.ok) {
           nameInput.value = "";
-          alert("새 게시판이 생성되었습니다!");
+          alert("새 게시판이 성공적으로 생성되었습니다!");
           loadBoards();
         } else {
-          alert("게시판 생성 실패");
+          alert("게시판 생성 중 오류가 발생했습니다.");
         }
       }
 
@@ -914,7 +950,6 @@
         teamMembers = await res.json();
       }
 
-      // 댓글 `@` 멘션 탭 자동완성
       function handleMentionInput(textarea) {
         const val = textarea.value;
         const cursor = textarea.selectionStart;
@@ -957,27 +992,6 @@
         textarea.focus();
       }
 
-      // 컨텍스트 메뉴 실행
-      function contextAction(type) {
-        if (type === "copy") {
-          clipboardData = memosCache[selectedContextMenuMemoId];
-          alert("대본이 복사되었습니다.");
-        } else if (type === "paste") {
-          if (!clipboardData) return alert("복사된 대본이 없습니다.");
-          socket.emit("memo:save", {
-            board_id: currentBoardId,
-            title: `${clipboardData.title} (복사본)`,
-            category: clipboardData.category,
-            status: clipboardData.status,
-            script: clipboardData.script,
-            rich_content: clipboardData.rich_content,
-            author: currentUser.name,
-          });
-        } else if (type === "delete") {
-          deleteMemo(selectedContextMenuMemoId);
-        }
-      }
-
       function switchView(view) {
         activeView = view;
         if (view === "kanban") {
@@ -990,25 +1004,17 @@
         if (currentBoardId) loadMemos();
       }
 
-      // 지우개 도구
-      function setTool(tool) {
-        fCanvas.currentTool = tool;
-        if (tool === "pen") fCanvas.isDrawingMode = true;
-        else fCanvas.isDrawingMode = false;
-      }
-
       function updatePenColor() {
-        if (fCanvas)
+        if (fCanvas && fCanvas.freeDrawingBrush)
           fCanvas.freeDrawingBrush.color =
             document.getElementById("penColor").value;
       }
 
       function clearDrawings() {
-        if (confirm("캔버스 그림을 지우시겠습니까?"))
+        if (confirm("캔버스 손그림을 지우시겠습니까?"))
           socket.emit("drawing:clear", currentBoardId);
       }
 
-      // 캔버스 다크모드 연동
       function toggleDarkMode() {
         document.body.classList.toggle("dark-mode");
       }
@@ -1272,7 +1278,6 @@
         closeModal("commentModal");
       }
 
-      // 활동 로그 모달 실행
       async function openAuditLogsModal() {
         const res = await fetch("/api/logs");
         const logs = await res.json();
