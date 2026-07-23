@@ -45,6 +45,49 @@ window.onload = () => {
   applyCanvasSize(canvasWidth, canvasHeight);
   updateGridSnapUI();
 
+  // 1. 누락되었던 캔버스 크기 적용 함수 추가
+  function applyCanvasSize(w, h) {
+    canvasWidth = w;
+    canvasHeight = h;
+    if (pCanvas) {
+      pCanvas.width = w;
+      pCanvas.height = h;
+    }
+    const sizeInfo = document.getElementById("canvasSizeInfo");
+    if (sizeInfo) {
+      sizeInfo.innerText = `${w}x${h}px`;
+    }
+  }
+
+  // 2. 로그인 함수 수정 (Form event 대응)
+  async function login(e) {
+    if (e) e.preventDefault(); // 폼 제출 시 페이지 새로고침 방지
+
+    const usernameInput = document.getElementById("username").value;
+    const passwordInput = document.getElementById("password").value;
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: usernameInput,
+          password: passwordInput,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        location.reload(); // 로그인 성공 시 정상 새로고침하여 메인 화면 진입
+      } else {
+        alert(data.message || "로그인 실패");
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      alert("로그인 처리 중 오류가 발생했습니다.");
+    }
+  }
+
   // 모바일/터치 지원 캔버스 드로잉 이벤트
   const getCanvasCoords = (e) => {
     const rect = pCanvas.getBoundingClientRect();

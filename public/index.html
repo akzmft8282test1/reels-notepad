@@ -56,9 +56,21 @@
     <!-- 로그인 화면 -->
     <div id="loginView" class="login-container">
       <h2>🔐 접속하기</h2>
-      <input type="text" id="username" placeholder="아이디" />
-      <input type="password" id="password" placeholder="비밀번호" />
-      <button onclick="login()">로그인</button>
+      <form onsubmit="login(event)">
+        <input
+          type="text"
+          id="username"
+          placeholder="아이디"
+          autocomplete="username"
+          required />
+        <input
+          type="password"
+          id="password"
+          placeholder="비밀번호"
+          autocomplete="current-password"
+          required />
+        <button type="submit">로그인</button>
+      </form>
     </div>
 
     <!-- 1. 칸반 보드 뷰 -->
