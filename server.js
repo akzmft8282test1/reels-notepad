@@ -12,13 +12,13 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY,
+  process.env.SUPABASE_URL || "https://placeholder.supabase.co",
+  process.env.SUPABASE_ANON_KEY || "placeholder_key",
 );
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || "reels_secret",
@@ -38,7 +38,7 @@ async function logAction(username, action, details) {
   }
 }
 
-app.get("/admin", (req, res) => {
+app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
@@ -51,20 +51,22 @@ app.post("/api/login", async (req, res) => {
     .eq("username", username)
     .single();
 
-  if (error || !user)
+  if (error || !user) {
     return res
       .status(401)
       .json({ success: false, message: "등록되지 않은 계정입니다." });
+  }
 
-  let isValidPassword =
+  const isValidPassword =
     user.password && user.password.startsWith("$2")
       ? await bcrypt.compare(password, user.password)
       : password === user.password;
 
-  if (!isValidPassword)
+  if (!isValidPassword) {
     return res
       .status(401)
       .json({ success: false, message: "비밀번호가 올바르지 않습니다." });
+  }
 
   req.session.user = {
     id: user.id,
@@ -93,23 +95,23 @@ app.get("/api/users", async (req, res) => {
     .from("allowed_users")
     .select("username, name");
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
-// 게시판 목록 조회
+// 게시판 API
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
     .select("*")
     .order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
-// 게시판 생성 API
 app.post("/api/boards", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
+  if (!req.session.user || req.session.user.role === "Viewer") {
     return res.status(403).json({ message: "권한이 없습니다." });
+  }
   const { name, description } = req.body;
   const { data, error } = await supabase
     .from("boards")
@@ -124,7 +126,6 @@ app.post("/api/boards", async (req, res) => {
   res.json(data[0]);
 });
 
-// 🎯 [게시판 삭제 API] Admin 및 관리자 전용 삭제 동작
 app.delete("/api/boards/:id", async (req, res) => {
   if (
     !req.session.user ||
@@ -138,6 +139,7 @@ app.delete("/api/boards/:id", async (req, res) => {
   try {
     await supabase.from("memos").delete().eq("board_id", boardId);
     await supabase.from("canvas_drawings").delete().eq("board_id", boardId);
+    await supabase.from("canvas_shapes").delete().eq("board_id", boardId);
     const { error } = await supabase.from("boards").delete().eq("id", boardId);
     if (error) throw error;
 
@@ -153,19 +155,38 @@ app.delete("/api/boards/:id", async (req, res) => {
   }
 });
 
-// 캔버스 크기 저장 API
-app.post("/api/boards/size", async (req, res) => {
-  const { boardId, width, height } = req.body;
-  try {
-    await supabase
-      .from("boards")
-      .update({ canvas_width: width, canvas_height: height })
-      .eq("id", boardId);
-    io.to(boardId).emit("canvas:resized", { width, height });
-    res.json({ success: true });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+// 도형 & 스티키노트 영구 저장/삭제/수정 API
+app.get("/api/shapes/:boardId", async (req, res) => {
+  const { data, error } = await supabase
+    .from("canvas_shapes")
+    .select("*")
+    .eq("board_id", req.params.boardId);
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data || []);
+});
+
+app.post("/api/shapes", async (req, res) => {
+  const shape = req.body;
+  const { data, error } = await supabase
+    .from("canvas_shapes")
+    .upsert([shape])
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  io.to(shape.board_id).emit("shape:updated", data[0]);
+  res.json(data[0]);
+});
+
+app.delete("/api/shapes/:id", async (req, res) => {
+  const { id } = req.params;
+  const { data, error } = await supabase
+    .from("canvas_shapes")
+    .delete()
+    .eq("id", id)
+    .select();
+  if (error) return res.status(500).json({ error: error.message });
+  if (data && data.length > 0)
+    io.to(data[0].board_id).emit("shape:deleted", id);
+  res.json({ success: true });
 });
 
 app.get("/api/memos/:boardId", async (req, res) => {
@@ -178,7 +199,7 @@ app.get("/api/memos/:boardId", async (req, res) => {
     .order("is_pinned", { ascending: false })
     .order("updated_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
 app.get("/api/trash/:boardId", async (req, res) => {
@@ -191,15 +212,12 @@ app.get("/api/trash/:boardId", async (req, res) => {
     .select("*")
     .eq("board_id", boardId)
     .eq("is_deleted", true)
-    .gte("deleted_at", sixtyDaysAgo)
-    .order("deleted_at", { ascending: false });
+    .gte("deleted_at", sixtyDaysAgo);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
 app.post("/api/memos/restore", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
-    return res.status(403).json({ message: "권한이 없습니다." });
   const { memoId } = req.body;
   const { data, error } = await supabase
     .from("memos")
@@ -211,20 +229,6 @@ app.post("/api/memos/restore", async (req, res) => {
   res.json({ success: true });
 });
 
-app.post("/api/memos/status", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
-    return res.status(403).json({ message: "권한이 없습니다." });
-  const { memoId, status } = req.body;
-  const { data, error } = await supabase
-    .from("memos")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", memoId)
-    .select();
-  if (error) return res.status(500).json({ error: error.message });
-  io.to(data[0].board_id).emit("memo:updated", data[0]);
-  res.json({ success: true, memo: data[0] });
-});
-
 app.get("/api/comments/:memoId", async (req, res) => {
   const { data, error } = await supabase
     .from("comments")
@@ -232,7 +236,7 @@ app.get("/api/comments/:memoId", async (req, res) => {
     .eq("memo_id", req.params.memoId)
     .order("created_at", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
 app.get("/api/history/:memoId", async (req, res) => {
@@ -242,7 +246,7 @@ app.get("/api/history/:memoId", async (req, res) => {
     .eq("memo_id", req.params.memoId)
     .order("created_at", { ascending: false });
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
 app.get("/api/logs", async (req, res) => {
@@ -252,10 +256,10 @@ app.get("/api/logs", async (req, res) => {
     .order("created_at", { ascending: false })
     .limit(50);
   if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
+  res.json(data || []);
 });
 
-// Socket.io 통신
+// Socket.io
 const activeUsers = new Map();
 
 io.on("connection", (socket) => {
@@ -270,15 +274,36 @@ io.on("connection", (socket) => {
       role: user.role,
       boardId: null,
     });
-    io.emit("presence:update", Array.from(activeUsers.values()));
   }
 
   socket.on("board:join", (boardId) => {
     socket.join(boardId);
     if (activeUsers.has(socket.id)) {
       activeUsers.get(socket.id).boardId = boardId;
-      io.emit("presence:update", Array.from(activeUsers.values()));
     }
+    const boardUsers = Array.from(activeUsers.values()).filter(
+      (u) => u.boardId === boardId,
+    );
+    io.to(boardId).emit("presence:update", boardUsers);
+  });
+
+  socket.on("cursor:move", ({ boardId, name, x, y }) => {
+    socket.to(boardId).emit("cursor:moved", { id: socket.id, name, x, y });
+  });
+
+  socket.on("shape:save", async (shapeData) => {
+    const { data } = await supabase
+      .from("canvas_shapes")
+      .upsert([shapeData])
+      .select();
+    if (data && data[0]) {
+      io.to(shapeData.board_id).emit("shape:updated", data[0]);
+    }
+  });
+
+  socket.on("shape:delete", async ({ id, boardId }) => {
+    await supabase.from("canvas_shapes").delete().eq("id", id);
+    io.to(boardId).emit("shape:deleted", id);
   });
 
   socket.on("memo:save", async (memoData) => {
@@ -294,13 +319,15 @@ io.on("connection", (socket) => {
         .eq("id", memoData.id)
         .single();
       if (oldMemo && oldMemo.script !== memoData.script) {
-        await supabase.from("script_history").insert([
-          {
-            memo_id: memoData.id,
-            script: oldMemo.script,
-            edited_by: user?.name || "익명",
-          },
-        ]);
+        await supabase
+          .from("script_history")
+          .insert([
+            {
+              memo_id: memoData.id,
+              script: oldMemo.script,
+              edited_by: user?.name || "익명",
+            },
+          ]);
       }
       const { data } = await supabase
         .from("memos")
@@ -343,31 +370,34 @@ io.on("connection", (socket) => {
       io.to(boardId).emit("comment:added", { memoId, comment: comment[0] });
   });
 
-  socket.on("memo:move", async ({ memoId, boardId, pos_x, pos_y }) => {
-    if (user?.role === "Viewer") return;
-    await supabase.from("memos").update({ pos_x, pos_y }).eq("id", memoId);
-    socket.to(boardId).emit("memo:moved", { memoId, pos_x, pos_y });
+  socket.on("memo:like", async ({ memoId, boardId }) => {
+    const { data } = await supabase.rpc("increment_likes", {
+      memo_id_input: memoId,
+    });
+    io.to(boardId).emit("memo:liked", { memoId });
   });
 
   socket.on("drawing:stroke", ({ boardId, strokeData }) => {
-    if (user?.role === "Viewer") return;
     socket.to(boardId).emit("drawing:stroke", strokeData);
   });
 
   socket.on("drawing:clear", (boardId) => {
-    if (user?.role === "Viewer") return;
     io.to(boardId).emit("drawing:cleared");
   });
 
   socket.on("disconnect", () => {
+    const u = activeUsers.get(socket.id);
     activeUsers.delete(socket.id);
-    io.emit("presence:update", Array.from(activeUsers.values()));
+    if (u && u.boardId) {
+      const boardUsers = Array.from(activeUsers.values()).filter(
+        (item) => item.boardId === u.boardId,
+      );
+      io.to(u.boardId).emit("presence:update", boardUsers);
+    }
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(
-    `🎬 릴스 협업 노트패드 스튜디오 실행 중: http://localhost:${PORT}`,
-  );
-});
+server.listen(PORT, () =>
+  console.log(`🚀 Server running on http://localhost:${PORT}`),
+);
