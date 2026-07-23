@@ -1,2 +1,10 @@
 .env
 .vscode/
+backups/
+backups/*
+backups/*.*
+backups/*/*.*
+#backups/*/*/*.*
+
+public/*.css
+public/*.js

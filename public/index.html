@@ -2,127 +2,559 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>🎬 릴스 스튜디오 Pro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🎬 릴스 대회 아이디어 & 피그마 스튜디오 Pro</title>
     <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Quill.js 서식 에디터 -->
     <link
       href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
       rel="stylesheet" />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
-    <link rel="stylesheet" href="style.css" />
+
+    <style>
+      :root {
+        --primary: #e1306c;
+        --bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text: #333333;
+        --border: #e0e0e0;
+        --canvas-bg: #f8fafc;
+        --grid-color: #cbd5e1;
+      }
+
+      body.dark-mode {
+        --bg: #121212;
+        --card-bg: #1e1e1e;
+        --text: #e0e0e0;
+        --border: #333333;
+        --canvas-bg: #18181b;
+        --grid-color: #3f3f46;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        overflow-x: hidden;
+      }
+
+      header {
+        background: var(--card-bg);
+        border-bottom: 1px solid var(--border);
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+        z-index: 100;
+      }
+      .logo {
+        font-weight: bold;
+        font-size: 1.2rem;
+        color: var(--primary);
+      }
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .online-users {
+        font-size: 0.85rem;
+        background: rgba(0, 0, 0, 0.05);
+        padding: 4px 10px;
+        border-radius: 12px;
+      }
+
+      .kanban-container {
+        display: flex;
+        gap: 15px;
+        overflow-x: auto;
+        padding-bottom: 20px;
+        margin-top: 20px;
+      }
+      .kanban-col {
+        flex: 1;
+        min-width: 280px;
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 8px;
+        padding: 12px;
+        border: 1px dashed var(--border);
+        position: relative;
+      }
+      .kanban-col-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+
+      .card {
+        background: var(--card-bg);
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        padding: 14px;
+        margin-bottom: 15px;
+        position: relative;
+        outline: none;
+      }
+      .card.selected,
+      .canvas-card.selected,
+      .sticky-note.selected {
+        border: 2px solid var(--primary) !important;
+        box-shadow: 0 0 12px rgba(225, 48, 108, 0.5);
+      }
+      .card.pinned {
+        border: 2px solid var(--primary);
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 6px;
+        font-size: 0.75rem;
+        border-radius: 4px;
+        background: #eee;
+        color: #333;
+        margin-right: 4px;
+      }
+
+      .script-box {
+        background: rgba(0, 0, 0, 0.05);
+        padding: 8px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        margin-top: 8px;
+        white-space: pre-wrap;
+      }
+      .char-warning {
+        color: #d9534f;
+        font-size: 0.75rem;
+        font-weight: bold;
+        display: none;
+        margin-top: 4px;
+      }
+
+      /* 영상 미리보기 팝업 */
+      .video-preview-wrapper {
+        position: relative;
+        display: inline-block;
+        margin-top: 6px;
+      }
+      .video-preview-btn {
+        font-size: 0.75rem;
+        color: #3897f0;
+        cursor: pointer;
+        font-weight: bold;
+        text-decoration: underline;
+      }
+      .video-preview-popup {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        height: 520px;
+        background: #000;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+        z-index: 999999 !important;
+        border: 2px solid var(--primary);
+      }
+      .video-preview-popup.active {
+        display: block;
+      }
+      .video-preview-popup iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+      }
+      .preview-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4px 8px;
+        border-radius: 20px;
+        cursor: pointer;
+        z-index: 1000000;
+      }
+
+      #canvasView {
+        display: none;
+        width: 100vw;
+        height: calc(100vh - 60px);
+        overflow: hidden;
+        position: relative;
+      }
+      #canvasContainer {
+        width: 3000px;
+        height: 3000px;
+        background-color: var(--canvas-bg);
+        background-image: radial-gradient(
+          var(--grid-color) 1.5px,
+          transparent 1.5px
+        );
+        background-size: 24px 24px;
+        position: absolute;
+        top: 0;
+        left: 0;
+        transform-origin: 0 0;
+      }
+      #paintCanvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+      }
+      .canvas-card {
+        position: absolute;
+        min-width: 240px;
+        background: var(--card-bg);
+        color: var(--text);
+        border-radius: 8px;
+        border: 2px solid var(--border);
+        padding: 12px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+        resize: both;
+        overflow: auto;
+        outline: none;
+      }
+      .canvas-card.locked {
+        border-style: dashed;
+        opacity: 0.8;
+      }
+
+      .remote-cursor {
+        position: absolute;
+        pointer-events: none;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: white;
+        white-space: nowrap;
+      }
+      .remote-cursor::before {
+        content: "↖";
+        font-size: 1.2rem;
+      }
+
+      .sticky-note {
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        padding: 12px;
+        border-radius: 4px;
+        box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15);
+        z-index: 12;
+        font-weight: bold;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        resize: both;
+        outline: none;
+      }
+
+      #minimap {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 160px;
+        height: 120px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        z-index: 500;
+        overflow: hidden;
+      }
+      #minimapViewport {
+        position: absolute;
+        border: 1.5px solid var(--primary);
+        background: rgba(225, 48, 108, 0.2);
+      }
+
+      #contextMenu {
+        display: none;
+        position: fixed;
+        background: var(--card-bg);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        z-index: 9999;
+        min-width: 160px;
+        padding: 6px 0;
+      }
+      #contextMenu div {
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+      }
+      #contextMenu div:hover {
+        background: var(--primary);
+        color: #fff;
+      }
+
+      #mentionDropdown {
+        display: none;
+        position: absolute;
+        background: #fff;
+        color: #000;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        max-height: 120px;
+        overflow-y: auto;
+        z-index: 3000;
+        width: 160px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+      }
+      #mentionDropdown div {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        cursor: pointer;
+      }
+      #mentionDropdown div:hover {
+        background: #ffe6ed;
+        color: var(--primary);
+        font-weight: bold;
+      }
+
+      .tool-btn.active {
+        background: var(--primary) !important;
+        color: white !important;
+        font-weight: bold;
+      }
+      .resize-btn-on {
+        background: #27ae60 !important;
+        color: white !important;
+        font-weight: bold;
+      }
+
+      .modal-bg {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        z-index: 2000;
+        justify-content: center;
+        align-items: center;
+      }
+      .modal {
+        background: var(--card-bg);
+        color: var(--text);
+        padding: 20px;
+        border-radius: 10px;
+        width: 90%;
+        max-width: 500px;
+        max-height: 85vh;
+        overflow-y: auto;
+      }
+      .reels-phone-frame {
+        width: 270px;
+        height: 480px;
+        background: #000;
+        color: #fff;
+        border-radius: 20px;
+        padding: 15px;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        margin: 0 auto;
+      }
+
+      .sidebar {
+        position: fixed;
+        right: -300px;
+        top: 0;
+        width: 260px;
+        height: 100%;
+        background: var(--card-bg);
+        box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+        transition: 0.3s;
+        z-index: 500;
+        padding: 20px;
+      }
+      .sidebar.open {
+        right: 0;
+      }
+
+      input,
+      textarea,
+      select,
+      button {
+        width: 100%;
+        padding: 8px;
+        margin-top: 6px;
+        box-sizing: border-box;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text);
+      }
+      button {
+        background: var(--primary);
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+
+      #adminConsole {
+        display: none;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 420px;
+        background: #1e1e1e;
+        color: #00ff66;
+        padding: 20px;
+        border-radius: 10px;
+        z-index: 3000;
+        font-family: monospace;
+      }
+    </style>
   </head>
   <body>
     <header>
       <div class="logo">🎬 릴스 메모장 Pro + Figma</div>
       <div class="header-right">
-        <button onclick="switchView('kanban')" class="nav-btn bg-blue">
+        <button
+          onclick="switchView('kanban')"
+          style="width: auto; padding: 4px 8px; background: #4a90e2">
           📋 칸반 뷰
         </button>
-        <button onclick="switchView('canvas')" class="nav-btn bg-green">
+        <button
+          onclick="switchView('canvas')"
+          style="width: auto; padding: 4px 8px; background: #27ae60">
           🎨 캔버스 뷰
         </button>
-        <button onclick="toggleGridSnap()" id="btnGridSnap" class="nav-btn">
-          🧲 그리드스냅: ON
+        <button
+          onclick="toggleDarkMode()"
+          style="width: auto; padding: 4px 8px">
+          🌙/☀️
         </button>
-        <button onclick="toggleDarkMode()" class="nav-btn">🌙/☀️</button>
-        <button onclick="openAuditLogsModal()" class="nav-btn bg-gray">
+        <button
+          onclick="openAuditLogsModal()"
+          style="width: auto; padding: 4px 8px; background: #7f8c8d">
           📜 활동로그
         </button>
-        <button onclick="toggleTrashModal()" class="nav-btn">🗑️ 휴지통</button>
+        <button
+          onclick="toggleTrashModal()"
+          style="width: auto; padding: 4px 8px">
+          🗑️ 휴지통
+        </button>
         <div id="onlineCount" class="online-users">접속자: 0명</div>
-        <button onclick="toggleSidebar()" class="menu-btn">☰</button>
+        <button
+          onclick="toggleSidebar()"
+          style="
+            width: auto;
+            background: none;
+            color: var(--text);
+            font-size: 1.4rem;
+          ">
+          ☰
+        </button>
       </div>
     </header>
 
-    <!-- 사이드바 -->
     <div id="sidebar" class="sidebar">
-      <div class="sidebar-header">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
         <h3>📌 게시판 목록</h3>
-        <span class="close-btn" onclick="toggleSidebar()">✕</span>
+        <span style="cursor: pointer" onclick="toggleSidebar()">✕</span>
       </div>
-      <ul id="boardList"></ul>
+      <ul id="boardList" style="list-style: none; padding: 0"></ul>
       <hr />
       <h4>+ 새 게시판 만들기</h4>
       <input type="text" id="newBoardName" placeholder="게시판 이름 입력" />
       <button onclick="createBoard()">게시판 생성</button>
-      <button class="bg-red mt-10" onclick="exportTXT()">
+      <button
+        style="background: #e74c3c; margin-top: 10px"
+        onclick="exportTXT()">
         📄 전체 대본 TXT 내보내기
       </button>
-      <button class="bg-gray mt-10" onclick="logout()">로그아웃</button>
+      <button style="background: #666; margin-top: 10px" onclick="logout()">
+        로그아웃
+      </button>
     </div>
 
     <!-- 로그인 화면 -->
-    <div id="loginView" class="login-container">
+    <div
+      id="loginView"
+      style="max-width: 360px; margin: 80px auto; text-align: center">
       <h2>🔐 접속하기</h2>
-      <form onsubmit="login(event)">
-        <input
-          type="text"
-          id="username"
-          placeholder="아이디"
-          autocomplete="username"
-          required />
-        <input
-          type="password"
-          id="password"
-          placeholder="비밀번호"
-          autocomplete="current-password"
-          required />
-        <button type="submit">로그인</button>
-      </form>
+      <input type="text" id="username" placeholder="아이디" />
+      <input type="password" id="password" placeholder="비밀번호" />
+      <button onclick="login()">로그인</button>
     </div>
 
     <!-- 1. 칸반 보드 뷰 -->
-    <div id="kanbanView" class="container">
-      <div class="kanban-header">
+    <div
+      id="kanbanView"
+      class="container"
+      style="
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 15px;
+        display: none;
+      ">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
         <h2 id="currentBoardTitle">기본 게시판</h2>
-        <div class="search-bar-wrap">
-          <input
-            type="text"
-            id="searchInput"
-            placeholder="🔍 실시간 검색 및 필터링..."
-            oninput="handleSearch(this.value)" />
-        </div>
-        <div class="btn-group">
-          <button class="bg-primary" onclick="openMemoModalWithType('hook')">
+        <div style="display: flex; gap: 6px">
+          <button
+            style="width: auto; background: var(--primary)"
+            onclick="openMemoModalWithType('hook')">
             ⚡ 3초 후킹 노드
           </button>
-          <button class="bg-blue" onclick="openMemoModalWithType('story')">
+          <button
+            style="width: auto; background: #3b82f6"
+            onclick="openMemoModalWithType('story')">
             📖 스토리 노드
           </button>
-          <button class="bg-green" onclick="openMemoModalWithType('custom')">
+          <button
+            style="width: auto; background: #10b981"
+            onclick="openMemoModalWithType('custom')">
             + 자유 아이디어
           </button>
         </div>
       </div>
 
       <div class="kanban-container">
-        <div
-          class="kanban-col"
-          ondragover="allowDrop(event)"
-          ondrop="drop(event, '아이디어')">
+        <div class="kanban-col">
           <div class="kanban-col-title">💡 아이디어</div>
           <div id="col-아이디어"></div>
         </div>
-        <div
-          class="kanban-col"
-          ondragover="allowDrop(event)"
-          ondrop="drop(event, '대본작성')">
+        <div class="kanban-col">
           <div class="kanban-col-title">✍️ 대본작성</div>
           <div id="col-대본작성"></div>
         </div>
-        <div
-          class="kanban-col"
-          ondragover="allowDrop(event)"
-          ondrop="drop(event, '촬영예정')">
+        <div class="kanban-col">
           <div class="kanban-col-title">🎥 촬영예정</div>
           <div id="col-촬영예정"></div>
         </div>
-        <div
-          class="kanban-col"
-          ondragover="allowDrop(event)"
-          ondrop="drop(event, '완료')">
+        <div class="kanban-col">
           <div class="kanban-col-title">✅ 완료</div>
           <div id="col-완료"></div>
         </div>
@@ -131,58 +563,100 @@
 
     <!-- 2. 무한 캔버스 뷰 -->
     <div id="canvasView">
-      <div class="canvas-toolbar">
-        <button id="btnPan" class="tool-btn active" onclick="setTool('pan')">
+      <div
+        style="
+          position: absolute;
+          top: 10px;
+          left: 10px;
+          z-index: 100;
+          display: flex;
+          gap: 6px;
+          background: rgba(255, 255, 255, 0.95);
+          padding: 6px;
+          border-radius: 8px;
+          border: 1px solid #ccc;
+          color: #000;
+          flex-wrap: wrap;
+        ">
+        <button
+          id="btnPan"
+          class="tool-btn active"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('pan')">
           🖐️ 이동(H)
         </button>
-        <button id="btnSelect" class="tool-btn" onclick="setTool('select')">
+        <button
+          id="btnSelect"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('select')">
           ↖️ 선택(V)
         </button>
-        <button id="btnPen" class="tool-btn" onclick="setTool('pen')">
+        <button
+          id="btnPen"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('pen')">
           ✏️ 펜(P)
         </button>
-        <button id="btnEraser" class="tool-btn" onclick="setTool('eraser')">
+        <button
+          id="btnEraser"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('eraser')">
           🧹 지우개
         </button>
-        <button class="bg-orange" onclick="addShape('rect')">🟦 사각형</button>
-        <button class="bg-purple" onclick="addShape('circle')">🟡 원형</button>
-        <button class="bg-yellow text-black" onclick="addStickyNote('#fef08a')">
+        <button
+          style="width: auto; padding: 4px 10px; background: #f39c12"
+          onclick="addShape('rect')">
+          🟦 사각형
+        </button>
+        <button
+          style="width: auto; padding: 4px 10px; background: #9b59b6"
+          onclick="addShape('circle')">
+          🟡 원형
+        </button>
+        <button
+          style="
+            width: auto;
+            padding: 4px 10px;
+            background: #f1c40f;
+            color: #000;
+          "
+          onclick="addStickyNote('#fef08a')">
           🟨 스티키노트
         </button>
-        <input type="color" id="penColor" value="#e1306c" />
-        <button id="btnGroup" onclick="groupSelectedElements()" class="bg-blue">
-          🔗 그룹화
-        </button>
-        <button
-          id="btnAutoLayout"
-          onclick="autoLayoutElements()"
-          class="bg-green">
-          📐 자동정렬
-        </button>
+        <input
+          type="color"
+          id="penColor"
+          value="#e1306c"
+          style="width: 28px; height: 24px; border: none; cursor: pointer" />
         <button
           id="btnResizeToggle"
-          class="bg-purple"
+          style="width: auto; padding: 4px 10px; background: #8e44ad"
           onclick="toggleAutoResize()">
-          ⚡ 자동확장: OFF 🔴
+          ⚡ 캔버스 자동확장: OFF 🔴
         </button>
-        <span id="canvasSizeInfo">3000x3000px</span>
-        <button class="bg-red" onclick="clearDrawings()">그림 지우기</button>
+        <span
+          id="canvasSizeInfo"
+          style="
+            font-size: 0.75rem;
+            align-self: center;
+            font-family: monospace;
+            margin-left: 4px;
+            color: #555;
+          "
+          >3000x3000px</span
+        >
+        <button
+          style="width: auto; padding: 4px 8px; background: #e74c3c"
+          onclick="clearDrawings()">
+          그림 지우기
+        </button>
       </div>
 
-      <div id="canvasContainer" class="grid-snapping">
+      <div id="canvasContainer">
         <canvas id="paintCanvas" width="3000" height="3000"></canvas>
-
-        <!-- 히스토리 타임라인 슬라이더 -->
-        <div id="timelineSliderBox" class="timeline-box">
-          <span>🕒 히스토리 슬라이더</span>
-          <input
-            type="range"
-            id="historyRange"
-            min="0"
-            max="100"
-            value="100"
-            oninput="handleHistorySlider(this.value)" />
-        </div>
       </div>
 
       <div id="minimap">
@@ -193,31 +667,32 @@
     <!-- 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
       <div onclick="contextAction('cut')">
-        <span>✂️ 잘라내기</span><small>Ctrl+X</small>
+        <span>✂️ 잘라내기</span><small style="opacity: 0.6">Ctrl+X</small>
       </div>
       <div onclick="contextAction('copy')">
-        <span>📋 대본 복사</span><small>Ctrl+C</small>
+        <span>📋 대본 복사</span><small style="opacity: 0.6">Ctrl+C</small>
       </div>
       <div onclick="contextAction('duplicate')">
-        <span>👯 복제하기</span><small>Ctrl+D</small>
+        <span>👯 복제하기</span><small style="opacity: 0.6">Ctrl+D</small>
+      </div>
+      <div onclick="contextAction('paste')">
+        <span>📥 붙여넣기</span><small style="opacity: 0.6">Ctrl+V</small>
       </div>
       <div onclick="contextAction('lock')"><span>🔒 개체 잠금/해제</span></div>
-      <div onclick="contextAction('delete')" class="text-red">
-        <span>🗑️ 삭제하기</span><small>Del</small>
+      <div onclick="contextAction('delete')" style="color: #e74c3c">
+        <span>🗑️ 삭제하기</span><small style="opacity: 0.6">Del</small>
       </div>
     </div>
 
-    <!-- 메모 모달 -->
+    <!-- 메모 작성/수정 모달 -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
-        3초 후킹 / 스토리 노드 작성
+        <h3>📝 메모/대본 작성</h3>
         <input type="hidden" id="editMemoId" />
-        <label>제목</label><input type="text" id="editTitle" />
-        <label>카테고리 (#태그)</label
-        ><input
-          type="text"
-          id="editCategory"
-          placeholder="예: #병맛, #챌린지" />
+        <label>제목</label>
+        <input type="text" id="editTitle" />
+        <label>카테고리 (#태그)</label>
+        <input type="text" id="editCategory" placeholder="예: #병맛, #챌린지" />
         <label>상태</label>
         <select id="editStatus">
           <option value="아이디어">💡 아이디어</option>
@@ -225,20 +700,29 @@
           <option value="촬영예정">🎥 촬영예정</option>
           <option value="완료">✅ 완료</option>
         </select>
-        <label>영상 URL</label><input type="text" id="editVideoUrl" />
-        <label>BGM 음원명 / 링크</label>
-        <div class="flex-gap">
+        <label>인스타 릴스 / 유튜브 URL (미리보기 지원)</label>
+        <input type="text" id="editVideoUrl" placeholder="https://..." />
+        <label>BGM 음원명 및 링크</label>
+        <div style="display: flex; gap: 5px">
           <input type="text" id="editBgmTitle" placeholder="음원명" />
-          <input type="text" id="editBgmUrl" placeholder="링크" />
+          <input type="text" id="editBgmUrl" placeholder="링크 (URL)" />
         </div>
-        <label>대본 작성</label>
-        <div id="quillEditor"></div>
+        <label>대본 (서식 편집 지원)</label>
+        <div
+          id="quillEditor"
+          style="
+            height: 140px;
+            background: #fff;
+            color: #000;
+            margin-top: 6px;
+          "></div>
         <div id="scriptWarning" class="char-warning">
-          ⚠️ 한 줄에 20자가 넘는 구절이 있어 가독성이 떨어질 수 있습니다!
+          ⚠️ 한 줄에 20자가 넘는 구절이 있습니다! 릴스 자막 가독성이 떨어질 수
+          있습니다.
         </div>
-        <div class="flex-gap mt-15">
+        <div style="display: flex; gap: 10px; margin-top: 15px">
           <button onclick="saveMemoModal()">저장하기</button>
-          <button class="bg-gray" onclick="closeModal('memoModal')">
+          <button style="background: #666" onclick="closeModal('memoModal')">
             취소
           </button>
         </div>
@@ -247,91 +731,1418 @@
 
     <!-- 댓글 모달 -->
     <div id="commentModal" class="modal-bg">
-      <div class="modal">
+      <div class="modal" style="position: relative">
         <h3>💬 아이디어 토론 댓글</h3>
-        <div id="commentList" class="comment-box"></div>
+        <div
+          id="commentList"
+          style="
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+          "></div>
         <div id="mentionDropdown"></div>
         <textarea
           id="newCommentText"
           placeholder="댓글 입력 (@ 입력 시 팀원 자동완성)"
           rows="2"
           oninput="handleMentionInput(this)"></textarea>
-        <button onclick="submitComment()" class="mt-6">댓글 작성</button>
-        <button class="bg-gray mt-5" onclick="closeModal('commentModal')">
+        <button onclick="submitComment()" style="margin-top: 6px">
+          댓글 작성
+        </button>
+        <button
+          style="background: #666; margin-top: 5px"
+          onclick="closeModal('commentModal')">
           닫기
         </button>
       </div>
     </div>
 
-    <!-- 미리보기, 로그, 히스토리, 휴지통 모달 -->
+    <!-- 📱 9:16 미리보기 모달 -->
     <div id="reelsModal" class="modal-bg">
-      <div class="modal bg-transparent">
+      <div class="modal" style="background: transparent; box-shadow: none">
         <div class="reels-phone-frame">
-          <div class="reels-header">
-            <span id="reelsPreviewTitle">릴스 미리보기</span
-            ><span onclick="closeModal('reelsModal')" class="cursor-pointer"
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 0.8rem;
+            ">
+            <span id="reelsPreviewTitle">릴스 미리보기</span>
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
               >✕</span
             >
           </div>
-          <div id="reelsPreviewScript" class="reels-body">
+          <div
+            style="
+              text-align: center;
+              padding: 20px;
+              font-size: 1.1rem;
+              font-weight: bold;
+              background: rgba(0, 0, 0, 0.6);
+              border-radius: 10px;
+            "
+            id="reelsPreviewScript">
             자막이 여기에 표시됩니다.
           </div>
-          <div class="reels-footer">
+          <div style="font-size: 0.8rem">
             🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- 활동 로그 모달 -->
     <div id="auditLogModal" class="modal-bg">
       <div class="modal">
-        <h3>📜 시스템 활동 로그</h3>
-        <div id="auditLogModalBox" class="log-box"></div>
-        <button class="bg-gray mt-10" onclick="closeModal('auditLogModal')">
+        <h3>📜 시스템 활동 로그 (Audit Log)</h3>
+        <div
+          id="auditLogModalBox"
+          style="
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: 6px;
+          "></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('auditLogModal')">
           닫기
         </button>
       </div>
     </div>
 
+    <!-- 히스토리 모달 -->
     <div id="historyModal" class="modal-bg">
       <div class="modal">
         <h3>📜 대본 변경 이력 (History)</h3>
-        <div id="historyList" class="log-box"></div>
-        <button class="bg-gray mt-10" onclick="closeModal('historyModal')">
+        <div id="historyList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('historyModal')">
           닫기
         </button>
       </div>
     </div>
 
+    <!-- 휴지통 모달 -->
     <div id="trashModal" class="modal-bg">
       <div class="modal">
         <h3>🗑️ 휴지통 (60일 보관)</h3>
-        <div id="trashList" class="log-box"></div>
-        <button class="bg-gray mt-10" onclick="closeModal('trashModal')">
+        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          style="background: #666; margin-top: 10px"
+          onclick="closeModal('trashModal')">
           닫기
         </button>
       </div>
     </div>
 
-    <!-- 단축키 오버레이 Cheat Sheet -->
-    <div id="cheatSheetModal" class="modal-bg">
-      <div class="modal">
-        <h3>⌨️ 키보드 단축키 오버레이 (Cheat Sheet)</h3>
-        <ul class="cheat-list">
-          <li><kbd>V</kbd> 선택 모드</li>
-          <li><kbd>H</kbd> 손/이동 모드</li>
-          <li><kbd>P</kbd> 펜 그리기 모드</li>
-          <li><kbd>Shift</kbd> + 클릭 : 다중 선택</li>
-          <li><kbd>Ctrl</kbd> + <kbd>D</kbd> : 복제하기</li>
-          <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> : 선택 요소 삭제</li>
-          <li><kbd>?</kbd> : 치트시트 열기/닫기</li>
-        </ul>
-        <button class="bg-gray mt-10" onclick="closeModal('cheatSheetModal')">
-          닫기
-        </button>
+    <!-- 어드민 콘솔 -->
+    <div id="adminConsole">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h3 style="margin: 0">⚡ ADMIN CONSOLE</h3>
+        <span style="cursor: pointer" onclick="closeAdminConsole()">✕</span>
       </div>
+      <p style="font-size: 0.8rem">신규 팀원 생성 및 활동 로그</p>
+      <input type="text" id="adminNewName" placeholder="닉네임" />
+      <input type="text" id="adminNewUsername" placeholder="아이디" />
+      <input type="password" id="adminNewPassword" placeholder="비밀번호" />
+      <select id="adminNewRole">
+        <option value="Member">Member</option>
+        <option value="Admin">Admin</option>
+        <option value="Viewer">Viewer</option>
+      </select>
+      <button onclick="addNewUser()">계정 추가하기</button>
+      <hr style="margin: 15px 0; border-color: #444" />
+      <button
+        style="background: #333; color: #00ff66"
+        onclick="loadAuditLogs()">
+        📜 활동 로그 조회
+      </button>
+      <div
+        id="auditLogBox"
+        style="
+          font-size: 0.75rem;
+          max-height: 120px;
+          overflow-y: auto;
+          margin-top: 8px;
+        "></div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+      const socket = io();
+      let currentUser = null;
+      let currentBoardId = null;
+      let activeSelectedMemoId = null;
+      let activeSelectedElement = null;
+      let selectedMemoForComment = null;
+      let clipboardData = null;
+      let quill = null;
+      let activeView = "kanban";
+      let currentTool = "pan";
+      let memosCache = {};
+      let teamMembers = [];
+
+      let canvasWidth =
+        parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
+      let canvasHeight =
+        parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
+      let isAutoResizing = false;
+      let resizeTimer = null;
+
+      let pCanvas = null;
+      let ctx = null;
+      let isDrawing = false;
+      let lastX = 0,
+        lastY = 0;
+
+      let isPanning = false;
+      let panStart = { x: 0, y: 0 };
+      let canvasPos = { x: 0, y: 0 };
+      let zoomLevel = 1.0;
+
+      // === 전역 스코프 함수 선언 (HTML Inline Event Handler 연동용) ===
+      window.switchView = function (view) {
+        activeView = view;
+        if (view === "kanban") {
+          document.getElementById("kanbanView").style.display = "block";
+          document.getElementById("canvasView").style.display = "none";
+        } else {
+          document.getElementById("kanbanView").style.display = "none";
+          document.getElementById("canvasView").style.display = "block";
+          setTool("pan");
+        }
+        if (currentBoardId) loadMemos();
+      };
+
+      window.toggleDarkMode = function () {
+        document.body.classList.toggle("dark-mode");
+      };
+
+      window.openAuditLogsModal = async function () {
+        try {
+          const res = await fetch("/api/logs");
+          const logs = await res.json();
+          document.getElementById("auditLogModalBox").innerHTML = (
+            Array.isArray(logs) ? logs : []
+          )
+            .map(
+              (l) =>
+                `<div style="margin-bottom:6px; border-bottom:1px solid #eee; padding-bottom:4px;"><b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})</div>`,
+            )
+            .join("");
+        } catch (e) {
+          console.error(e);
+        }
+        document.getElementById("auditLogModal").style.display = "flex";
+      };
+
+      window.toggleTrashModal = async function () {
+        if (!currentBoardId) return alert("선택된 게시판이 없습니다.");
+        try {
+          const res = await fetch(`/api/trash/${currentBoardId}`);
+          const trashMemos = await res.json();
+          const box = document.getElementById("trashList");
+          box.innerHTML = (Array.isArray(trashMemos) ? trashMemos : [])
+            .map(
+              (t) =>
+                `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; margin-bottom:6px;"><span>${t.title} (삭제일: ${new Date(t.deleted_at).toLocaleDateString()})</span><button style="width:auto; padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button></div>`,
+            )
+            .join("");
+        } catch (e) {
+          console.error(e);
+        }
+        document.getElementById("trashModal").style.display = "flex";
+      };
+
+      window.toggleSidebar = function () {
+        document.getElementById("sidebar").classList.toggle("open");
+      };
+
+      window.createBoard = async function () {
+        const nameInput = document.getElementById("newBoardName");
+        const name = nameInput.value.trim();
+        if (!name) return alert("게시판 이름을 입력해 주세요.");
+
+        const res = await fetch("/api/boards", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name }),
+        });
+
+        if (res.ok) {
+          nameInput.value = "";
+          alert("새 게시판이 생성되었습니다!");
+          loadBoards();
+        }
+      };
+
+      window.exportTXT = async function () {
+        if (!currentBoardId) return alert("선택된 게시판이 없습니다.");
+        const res = await fetch(`/api/memos/${currentBoardId}`);
+        const memos = await res.json();
+        let content = `🎬 [릴스 대본 집합]\n\n`;
+        (Array.isArray(memos) ? memos : []).forEach((m, i) => {
+          content += `============== ${i + 1}. ${m.title} ==============\n대본:\n${m.script}\n\n`;
+        });
+        const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `reels_scripts_${Date.now()}.txt`;
+        a.click();
+      };
+
+      window.logout = async function () {
+        await fetch("/api/logout", { method: "POST" });
+        location.reload();
+      };
+
+      window.login = async function () {
+        const username = document.getElementById("username").value;
+        const password = document.getElementById("password").value;
+        const res = await fetch("/api/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (data.success) location.reload();
+        else alert(data.message);
+      };
+
+      window.openMemoModalWithType = function (type) {
+        document.getElementById("editMemoId").value = "";
+        document.getElementById("editVideoUrl").value = "";
+        document.getElementById("editBgmTitle").value = "";
+        document.getElementById("editBgmUrl").value = "";
+
+        if (type === "hook") {
+          document.getElementById("editTitle").value = "⚡ 3초 후킹 대본 노드";
+          document.getElementById("editCategory").value = "#후킹";
+          quill.clipboard.dangerouslyPasteHTML(
+            "<p><strong style='color:rgb(225,48,108);'>[3초 후킹]</strong>: 아직도 ~하시나요?</p><p>[본문]: </p>",
+          );
+        } else if (type === "story") {
+          document.getElementById("editTitle").value = "📖 스토리텔링 노드";
+          document.getElementById("editCategory").value = "#스토리";
+          quill.clipboard.dangerouslyPasteHTML(
+            "<p><strong>[도입]</strong>: 완벽한 대본을 작성해보세요.</p><p>[전개]: </p>",
+          );
+        } else {
+          document.getElementById("editTitle").value = "💡 자유 아이디어 노드";
+          document.getElementById("editCategory").value = "#아이디어";
+          quill.clipboard.dangerouslyPasteHTML("<p>[아이디어 설명]: </p>");
+        }
+
+        document.getElementById("memoModal").style.display = "flex";
+      };
+
+      window.setTool = function (tool) {
+        currentTool = tool;
+        document
+          .querySelectorAll(".tool-btn")
+          .forEach((btn) => btn.classList.remove("active"));
+        const canvasView = document.getElementById("canvasView");
+
+        if (tool === "pan") {
+          document.getElementById("btnPan").classList.add("active");
+          canvasView.style.cursor = "grab";
+        } else if (tool === "select") {
+          document.getElementById("btnSelect").classList.add("active");
+          canvasView.style.cursor = "default";
+        } else if (tool === "pen") {
+          document.getElementById("btnPen").classList.add("active");
+          canvasView.style.cursor = "crosshair";
+        } else if (tool === "eraser") {
+          document.getElementById("btnEraser").classList.add("active");
+          canvasView.style.cursor = "cell";
+        }
+      };
+
+      window.addShape = function (type) {
+        const shape = document.createElement("div");
+        shape.className = "canvas-card";
+        shape.id = "shape-" + Date.now();
+        shape.style.left = `${300 - canvasPos.x}px`;
+        shape.style.top = `${300 - canvasPos.y}px`;
+        shape.style.width = "120px";
+        shape.style.height = "120px";
+        shape.style.background = document.getElementById("penColor").value;
+
+        if (type === "circle") shape.style.borderRadius = "50%";
+
+        makeDraggable(shape);
+
+        shape.onclick = (e) => {
+          e.stopPropagation();
+          activeSelectedElement = shape;
+          activeSelectedMemoId = shape.id;
+          highlightSelectedCard(shape.id, shape);
+        };
+
+        document.getElementById("canvasContainer").appendChild(shape);
+      };
+
+      window.addStickyNote = function (color) {
+        const id = "sticky-" + Date.now();
+        const note = document.createElement("textarea");
+        note.className = "sticky-note";
+        note.id = id;
+        note.style.background = color;
+        note.style.left = `${200 - canvasPos.x}px`;
+        note.style.top = `${200 - canvasPos.y}px`;
+        note.placeholder = "아이디어 메모...";
+
+        makeDraggable(note);
+
+        note.onclick = (e) => {
+          e.stopPropagation();
+          activeSelectedElement = note;
+          activeSelectedMemoId = id;
+          highlightSelectedCard(id, note);
+        };
+
+        document.getElementById("canvasContainer").appendChild(note);
+      };
+
+      window.toggleAutoResize = function () {
+        isAutoResizing = !isAutoResizing;
+        const btn = document.getElementById("btnResizeToggle");
+
+        if (isAutoResizing) {
+          btn.classList.add("resize-btn-on");
+          btn.innerText = "⚡ 캔버스 크기 늘리기: ON 🟢 (클릭 시 멈춤)";
+
+          resizeTimer = setInterval(() => {
+            canvasWidth += 1000;
+            canvasHeight += 1000;
+            applyCanvasSize(canvasWidth, canvasHeight);
+            saveCanvasSize(canvasWidth, canvasHeight);
+          }, 1000);
+        } else {
+          btn.classList.remove("resize-btn-on");
+          btn.innerText = "⚡ 캔버스 크기 늘리기: OFF 🔴";
+          if (resizeTimer) clearInterval(resizeTimer);
+          saveCanvasSize(canvasWidth, canvasHeight);
+        }
+      };
+
+      window.clearDrawings = function () {
+        if (confirm("모든 그림을 지우시겠습니까?")) {
+          ctx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+          socket.emit("drawing:clear", currentBoardId);
+        }
+      };
+
+      window.contextAction = function (type) {
+        if (type === "copy" && activeSelectedMemoId) {
+          clipboardData = memosCache[activeSelectedMemoId];
+          alert("대본이 복사되었습니다.");
+        } else if (type === "cut" && activeSelectedMemoId) {
+          clipboardData = memosCache[activeSelectedMemoId];
+          deleteMemo(activeSelectedMemoId);
+          activeSelectedMemoId = null;
+          alert("대본이 잘라내기 처리 되었습니다.");
+        } else if (type === "duplicate" && activeSelectedMemoId) {
+          const target = memosCache[activeSelectedMemoId];
+          if (target) {
+            socket.emit("memo:save", {
+              board_id: currentBoardId,
+              title: `${target.title} (사본)`,
+              category: target.category,
+              status: target.status,
+              script: target.script,
+              rich_content: target.rich_content,
+              author: currentUser ? currentUser.name : "익명",
+              pos_x: (target.pos_x || 100) + 30,
+              pos_y: (target.pos_y || 100) + 30,
+            });
+          }
+        } else if (type === "lock" && activeSelectedElement) {
+          activeSelectedElement.classList.toggle("locked");
+        } else if (type === "delete") {
+          if (
+            activeSelectedElement &&
+            activeSelectedElement.classList.contains("sticky-note")
+          ) {
+            activeSelectedElement.remove();
+            activeSelectedElement = null;
+          } else if (activeSelectedMemoId) {
+            deleteMemo(activeSelectedMemoId);
+            activeSelectedMemoId = null;
+          }
+        }
+      };
+
+      window.saveMemoModal = function () {
+        const id = document.getElementById("editMemoId").value;
+        const memoData = {
+          id: id || undefined,
+          board_id: currentBoardId,
+          title: document.getElementById("editTitle").value || "무제 아이디어",
+          category: document.getElementById("editCategory").value || "#일반",
+          status: document.getElementById("editStatus").value,
+          video_url: document.getElementById("editVideoUrl").value,
+          bgm_title: document.getElementById("editBgmTitle").value,
+          bgm_url: document.getElementById("editBgmUrl").value,
+          rich_content: quill.root.innerHTML,
+          script: quill.getText(),
+          author: currentUser ? currentUser.name : "익명",
+        };
+        socket.emit("memo:save", memoData);
+        closeModal("memoModal");
+      };
+
+      window.closeModal = function (id) {
+        document.getElementById(id).style.display = "none";
+      };
+
+      window.submitComment = function () {
+        const text = document.getElementById("newCommentText").value;
+        if (!text) return;
+        socket.emit("comment:add", {
+          memoId: selectedMemoForComment,
+          boardId: currentBoardId,
+          content: text,
+        });
+        document.getElementById("newCommentText").value = "";
+        closeModal("commentModal");
+      };
+
+      window.closeAdminConsole = function () {
+        document.getElementById("adminConsole").style.display = "none";
+      };
+
+      window.addNewUser = async function () {
+        const name = document.getElementById("adminNewName").value;
+        const username = document.getElementById("adminNewUsername").value;
+        const password = document.getElementById("adminNewPassword").value;
+        const role = document.getElementById("adminNewRole").value;
+        const res = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, username, password, role }),
+        });
+        const data = await res.json();
+        if (data.success) alert("계정이 생성되었습니다!");
+        else alert(data.message || "생성 실패");
+      };
+
+      window.loadAuditLogs = async function () {
+        const res = await fetch("/api/logs");
+        const logs = await res.json();
+        document.getElementById("auditLogBox").innerHTML = (
+          Array.isArray(logs) ? logs : []
+        )
+          .map(
+            (l) =>
+              `<div>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}: ${l.action}</div>`,
+          )
+          .join("");
+      };
+
+      window.editMemo = function (memoId) {
+        const memo = memosCache[memoId];
+        if (!memo) return;
+        document.getElementById("editMemoId").value = memo.id;
+        document.getElementById("editTitle").value = memo.title;
+        document.getElementById("editCategory").value = memo.category || "";
+        document.getElementById("editVideoUrl").value = memo.video_url || "";
+        document.getElementById("editBgmTitle").value = memo.bgm_title || "";
+        document.getElementById("editBgmUrl").value = memo.bgm_url || "";
+        quill.clipboard.dangerouslyPasteHTML(
+          memo.rich_content || memo.script || "",
+        );
+        document.getElementById("memoModal").style.display = "flex";
+      };
+
+      window.deleteMemo = function (memoId) {
+        if (confirm("이 메모를 삭제하시겠습니까?")) {
+          socket.emit("memo:delete", { memoId, boardId: currentBoardId });
+        }
+      };
+
+      window.deleteBoard = async function (boardId, boardName) {
+        if (
+          !confirm(
+            `정말로 [${boardName}] 게시판과 내부 모든 메모를 삭제하시겠습니까?`,
+          )
+        )
+          return;
+        const res = await fetch(`/api/boards/${boardId}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (data.success) {
+          alert("게시판이 성공적으로 삭제되었습니다.");
+          currentBoardId = null;
+          loadBoards();
+        } else {
+          alert(data.message || "삭제 실패");
+        }
+      };
+
+      window.toggleVideoPreview = function (memoId) {
+        const popup = document.getElementById(`preview-popup-${memoId}`);
+        if (popup) {
+          const isActive = popup.classList.contains("active");
+          document
+            .querySelectorAll(".video-preview-popup")
+            .forEach((p) => p.classList.remove("active"));
+          if (!isActive) popup.classList.add("active");
+        }
+      };
+
+      window.openReelsModal = function (title, script, bgm) {
+        document.getElementById("reelsPreviewTitle").innerText = title;
+        document.getElementById("reelsPreviewScript").innerText =
+          script || "대본이 없습니다.";
+        document.getElementById("reelsPreviewBgm").innerText =
+          bgm || "기본 음원";
+        document.getElementById("reelsModal").style.display = "flex";
+      };
+
+      window.openCommentModal = async function (memoId) {
+        selectedMemoForComment = memoId;
+        const res = await fetch(`/api/comments/${memoId}`);
+        const comments = await res.json();
+        const box = document.getElementById("commentList");
+        box.innerHTML = (Array.isArray(comments) ? comments : [])
+          .map(
+            (c) =>
+              `<div style="font-size:0.8rem; margin-bottom:6px;"><b>${c.author}:</b> ${c.content} <span style="color:#aaa; font-size:0.7rem;">(${new Date(c.created_at).toLocaleTimeString()})</span></div>`,
+          )
+          .join("");
+        document.getElementById("commentModal").style.display = "flex";
+      };
+
+      window.openHistoryModal = async function (memoId) {
+        const res = await fetch(`/api/history/${memoId}`);
+        const logs = await res.json();
+        const box = document.getElementById("historyList");
+        box.innerHTML = (Array.isArray(logs) ? logs : [])
+          .map(
+            (l) =>
+              `<div style="font-size:0.8rem; border-bottom:1px solid #ccc; padding:6px 0;"><div>✍️ <b>${l.edited_by}</b> (${new Date(l.created_at).toLocaleString()})</div><pre style="background:#eee; padding:4px;">${l.script}</pre></div>`,
+          )
+          .join("");
+        document.getElementById("historyModal").style.display = "flex";
+      };
+
+      window.restoreMemo = async function (memoId) {
+        await fetch("/api/memos/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ memoId }),
+        });
+        closeModal("trashModal");
+        loadMemos();
+      };
+
+      window.likeMemo = function (memoId) {
+        if (window.FigmaExt && window.FigmaExt.addVote) {
+          window.FigmaExt.addVote(memoId);
+        }
+        socket.emit("memo:like", { memoId, boardId: currentBoardId });
+      };
+
+      function getEmbedUrl(url) {
+        if (!url) return null;
+        const ytMatch = url.match(
+          /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
+        );
+        if (ytMatch && ytMatch[1])
+          return `https://www.youtube.com/embed/${ytMatch[1]}`;
+        const instaMatch = url.match(
+          /instagram\.com\/(?:p|reel|reels)\/([^/?#&]+)/,
+        );
+        if (instaMatch && instaMatch[1])
+          return `https://www.instagram.com/p/${instaMatch[1]}/embed`;
+        return null;
+      }
+
+      window.onload = () => {
+        quill = new Quill("#quillEditor", { theme: "snow" });
+        quill.on("text-change", () => checkScriptWarning(quill.getText()));
+
+        pCanvas = document.getElementById("paintCanvas");
+        ctx = pCanvas.getContext("2d");
+
+        applyCanvasSize(canvasWidth, canvasHeight);
+
+        pCanvas.addEventListener("mousedown", (e) => {
+          if (currentTool !== "pen" && currentTool !== "eraser") return;
+          isDrawing = true;
+          const rect = pCanvas.getBoundingClientRect();
+          lastX = (e.clientX - rect.left) / zoomLevel;
+          lastY = (e.clientY - rect.top) / zoomLevel;
+        });
+
+        pCanvas.addEventListener("mousemove", (e) => {
+          if (!isDrawing) return;
+          const rect = pCanvas.getBoundingClientRect();
+          const currentX = (e.clientX - rect.left) / zoomLevel;
+          const currentY = (e.clientY - rect.top) / zoomLevel;
+
+          ctx.beginPath();
+          ctx.moveTo(lastX, lastY);
+          ctx.lineTo(currentX, currentY);
+
+          if (currentTool === "eraser") {
+            ctx.globalCompositeOperation = "destination-out";
+            ctx.lineWidth = 25;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          } else if (currentTool === "pen") {
+            ctx.globalCompositeOperation = "source-over";
+            ctx.strokeStyle = document.getElementById("penColor").value;
+            ctx.lineWidth = 4;
+            ctx.lineCap = "round";
+            ctx.stroke();
+          }
+
+          socket.emit("drawing:stroke", {
+            boardId: currentBoardId,
+            strokeData: {
+              tool: currentTool,
+              x1: lastX,
+              y1: lastY,
+              x2: currentX,
+              y2: currentY,
+              color: document.getElementById("penColor").value,
+            },
+          });
+
+          lastX = currentX;
+          lastY = currentY;
+        });
+
+        window.addEventListener("mouseup", () => {
+          isDrawing = false;
+        });
+
+        const canvasView = document.getElementById("canvasView");
+        const container = document.getElementById("canvasContainer");
+
+        canvasView.addEventListener(
+          "wheel",
+          (e) => {
+            if (e.ctrlKey) {
+              e.preventDefault();
+              zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
+              zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
+              updateCanvasTransform();
+            }
+          },
+          { passive: false },
+        );
+
+        canvasView.addEventListener("mousemove", (e) => {
+          if (currentBoardId && currentUser) {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            socket.emit("cursor:move", {
+              boardId: currentBoardId,
+              name: currentUser.name,
+              x,
+              y,
+            });
+          }
+        });
+
+        canvasView.addEventListener("mousedown", (e) => {
+          if (
+            currentTool === "pan" &&
+            !e.target.closest(".canvas-card, .sticky-note")
+          ) {
+            isPanning = true;
+            panStart = {
+              x: e.clientX - canvasPos.x,
+              y: e.clientY - canvasPos.y,
+            };
+            canvasView.style.cursor = "grabbing";
+          }
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (isPanning) {
+            canvasPos.x = e.clientX - panStart.x;
+            canvasPos.y = e.clientY - panStart.y;
+            updateCanvasTransform();
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          if (isPanning) {
+            isPanning = false;
+            if (currentTool === "pan") canvasView.style.cursor = "grab";
+          }
+        });
+
+        window.addEventListener("contextmenu", (e) => {
+          e.preventDefault();
+          const cardEl = e.target.closest(".card, .canvas-card, .sticky-note");
+          const contextMenu = document.getElementById("contextMenu");
+
+          if (cardEl) {
+            activeSelectedElement = cardEl;
+            activeSelectedMemoId =
+              cardEl.dataset.id || cardEl.id.replace("card-", "");
+            highlightSelectedCard(activeSelectedMemoId, cardEl);
+
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.display = "block";
+          }
+        });
+
+        window.addEventListener("click", () => {
+          document.getElementById("contextMenu").style.display = "none";
+        });
+
+        window.addEventListener("keydown", (e) => {
+          const activeTag = document.activeElement
+            ? document.activeElement.tagName.toLowerCase()
+            : "";
+          const isEditingText =
+            activeTag === "input" ||
+            (activeTag === "textarea" &&
+              document.activeElement !== activeSelectedElement) ||
+            document.activeElement.classList.contains("ql-editor");
+
+          if (isEditingText) return;
+
+          if (e.key.toLowerCase() === "v") setTool("select");
+          if (e.key.toLowerCase() === "h") setTool("pan");
+          if (e.key.toLowerCase() === "p") setTool("pen");
+
+          if (
+            e.ctrlKey &&
+            e.key.toLowerCase() === "d" &&
+            activeSelectedMemoId
+          ) {
+            e.preventDefault();
+            contextAction("duplicate");
+          }
+
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (
+              activeSelectedElement &&
+              activeSelectedElement.classList.contains("sticky-note")
+            ) {
+              e.preventDefault();
+              activeSelectedElement.remove();
+              activeSelectedElement = null;
+            } else if (activeSelectedMemoId) {
+              e.preventDefault();
+              deleteMemo(activeSelectedMemoId);
+              activeSelectedMemoId = null;
+            }
+          }
+        });
+
+        init();
+      };
+
+      function updateCanvasTransform() {
+        const container = document.getElementById("canvasContainer");
+        container.style.transform = `translate(${canvasPos.x}px, ${canvasPos.y}px) scale(${zoomLevel})`;
+        updateMinimap();
+      }
+
+      function updateMinimap() {
+        const viewport = document.getElementById("minimapViewport");
+        const ratioX = 160 / canvasWidth;
+        const ratioY = 120 / canvasHeight;
+
+        viewport.style.width = `${(window.innerWidth / zoomLevel) * ratioX}px`;
+        viewport.style.height = `${(window.innerHeight / zoomLevel) * ratioY}px`;
+        viewport.style.left = `${Math.max(0, -canvasPos.x * ratioX)}px`;
+        viewport.style.top = `${Math.max(0, -canvasPos.y * ratioY)}px`;
+      }
+
+      function makeDraggable(element) {
+        let isDragging = false,
+          offsetLeft = 0,
+          offsetTop = 0;
+
+        element.addEventListener("mousedown", (e) => {
+          if (currentTool !== "select" || element.classList.contains("locked"))
+            return;
+          isDragging = true;
+          offsetLeft = e.clientX / zoomLevel - element.offsetLeft;
+          offsetTop = e.clientY / zoomLevel - element.offsetTop;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+          if (isDragging && currentTool === "select") {
+            const newX = e.clientX / zoomLevel - offsetLeft;
+            const newY = e.clientY / zoomLevel - offsetTop;
+
+            if (window.FigmaExt && window.FigmaExt.getSnappedPos) {
+              element.style.left = `${window.FigmaExt.getSnappedPos(newX)}px`;
+              element.style.top = `${window.FigmaExt.getSnappedPos(newY)}px`;
+            } else {
+              element.style.left = `${newX}px`;
+              element.style.top = `${newY}px`;
+            }
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          isDragging = false;
+        });
+      }
+
+      function checkScriptWarning(text) {
+        const lines = text.split("\n");
+        const hasLongLine = lines.some((l) => l.length > 20);
+        document.getElementById("scriptWarning").style.display = hasLongLine
+          ? "block"
+          : "none";
+      }
+
+      const secretSequence = [
+        "ArrowUp",
+        "ArrowDown",
+        "ArrowUp",
+        "ArrowLeft",
+        "ArrowUp",
+        "ArrowRight",
+        "ArrowUp",
+      ];
+      let inputBuffer = [];
+      document.addEventListener("keydown", (e) => {
+        inputBuffer.push(e.key);
+        if (inputBuffer.length > secretSequence.length) inputBuffer.shift();
+        if (JSON.stringify(inputBuffer) === JSON.stringify(secretSequence)) {
+          document.getElementById("adminConsole").style.display = "block";
+          inputBuffer = [];
+        }
+      });
+
+      function applyCanvasSize(w, h) {
+        const container = document.getElementById("canvasContainer");
+        container.style.width = `${w}px`;
+        container.style.height = `${h}px`;
+
+        if (pCanvas && ctx) {
+          const imgData = ctx.getImageData(0, 0, pCanvas.width, pCanvas.height);
+          pCanvas.width = w;
+          pCanvas.height = h;
+          ctx.putImageData(imgData, 0, 0);
+        }
+        document.getElementById("canvasSizeInfo").innerText = `${w}x${h}px`;
+        updateMinimap();
+      }
+
+      function saveCanvasSize(w, h) {
+        localStorage.setItem("savedCanvasWidth", w);
+        localStorage.setItem("savedCanvasHeight", h);
+        if (currentBoardId) {
+          fetch("/api/boards/size", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              boardId: currentBoardId,
+              width: w,
+              height: h,
+            }),
+          });
+        }
+      }
+
+      async function init() {
+        try {
+          const res = await fetch("/api/me");
+          const data = await res.json();
+          if (data.loggedIn) {
+            currentUser = data.user;
+            document.getElementById("loginView").style.display = "none";
+            switchView("kanban");
+            loadBoards();
+            loadTeamMembers();
+          }
+        } catch (e) {
+          console.error("Init Error:", e);
+        }
+      }
+
+      async function loadTeamMembers() {
+        const res = await fetch("/api/users");
+        const data = await res.json();
+        teamMembers = Array.isArray(data) ? data : [];
+      }
+
+      function handleMentionInput(textarea) {
+        const val = textarea.value;
+        const cursor = textarea.selectionStart;
+        const lastAt = val.lastIndexOf("@", cursor);
+        const dropdown = document.getElementById("mentionDropdown");
+
+        if (lastAt !== -1 && lastAt < cursor) {
+          const query = val.slice(lastAt + 1, cursor).toLowerCase();
+          const matches = teamMembers.filter(
+            (m) =>
+              m.name.toLowerCase().includes(query) ||
+              m.username.toLowerCase().includes(query),
+          );
+
+          if (matches.length > 0) {
+            dropdown.innerHTML = matches
+              .map(
+                (m) =>
+                  `<div onclick="selectMention('${m.name}', ${lastAt})">@${m.name} (${m.username})</div>`,
+              )
+              .join("");
+            dropdown.style.left = `${textarea.offsetLeft + 10}px`;
+            dropdown.style.top = `${textarea.offsetTop - 80}px`;
+            dropdown.style.display = "block";
+            return;
+          }
+        }
+        dropdown.style.display = "none";
+      }
+
+      function selectMention(name, lastAtIndex) {
+        const textarea = document.getElementById("newCommentText");
+        const val = textarea.value;
+        textarea.value =
+          val.slice(0, lastAtIndex) +
+          `@${name} ` +
+          val.slice(textarea.selectionStart);
+        document.getElementById("mentionDropdown").style.display = "none";
+        textarea.focus();
+      }
+
+      function highlightSelectedCard(memoId, element = null) {
+        document
+          .querySelectorAll(".card, .canvas-card, .sticky-note")
+          .forEach((el) => el.classList.remove("selected"));
+        if (element) {
+          element.classList.add("selected");
+        } else {
+          const target = document.querySelector(
+            `.card[data-id="${memoId}"], #card-${memoId}`,
+          );
+          if (target) target.classList.add("selected");
+        }
+      }
+
+      async function loadBoards() {
+        const res = await fetch("/api/boards");
+        const boards = await res.json();
+        const listEl = document.getElementById("boardList");
+        listEl.innerHTML = "";
+
+        if (Array.isArray(boards)) {
+          boards.forEach((board, idx) => {
+            const li = document.createElement("li");
+            li.style.display = "flex";
+            li.style.justifyContent = "space-between";
+            li.style.alignItems = "center";
+            li.style.padding = "6px 8px";
+
+            li.innerHTML = `
+              <span style="cursor:pointer; flex:1;" onclick="selectBoardById('${board.id}', '${board.name}')">${board.name}</span>
+              ${currentUser?.role === "Admin" || currentUser?.role === "Member" ? `<button style="width:auto; padding:2px 6px; background:#e74c3c; font-size:0.75rem;" onclick="deleteBoard('${board.id}', '${board.name}')">🗑️</button>` : ""}
+            `;
+
+            if ((idx === 0 && !currentBoardId) || currentBoardId === board.id) {
+              selectBoard(board);
+            }
+            listEl.appendChild(li);
+          });
+        }
+      }
+
+      window.selectBoardById = function (id, name) {
+        selectBoard({ id, name });
+      };
+
+      function selectBoard(board) {
+        currentBoardId = board.id;
+        document.getElementById("currentBoardTitle").innerText = board.name;
+
+        if (board.canvas_width && board.canvas_height) {
+          canvasWidth = board.canvas_width;
+          canvasHeight = board.canvas_height;
+          applyCanvasSize(canvasWidth, canvasHeight);
+        }
+
+        socket.emit("board:join", board.id);
+        loadMemos();
+      }
+
+      async function loadMemos() {
+        if (!currentBoardId) return;
+        const res = await fetch(`/api/memos/${currentBoardId}`);
+        const memos = await res.json();
+        const memoList = Array.isArray(memos) ? memos : [];
+        if (activeView === "kanban") renderKanban(memoList);
+        else renderCanvas(memoList);
+      }
+
+      function renderKanban(memos) {
+        ["아이디어", "대본작성", "촬영예정", "완료"].forEach((status) => {
+          document.getElementById(`col-${status}`).innerHTML = "";
+        });
+
+        memos.forEach((memo) => {
+          memosCache[memo.id] = memo;
+          const estSeconds = Math.ceil((memo.script || "").length / 6);
+          const colEl =
+            document.getElementById(`col-${memo.status}`) ||
+            document.getElementById("col-아이디어");
+          const embedUrl = getEmbedUrl(memo.video_url);
+
+          const card = document.createElement("div");
+          card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
+          card.dataset.id = memo.id;
+          card.tabIndex = 0;
+          card.onclick = () => {
+            activeSelectedMemoId = memo.id;
+            activeSelectedElement = card;
+            highlightSelectedCard(memo.id);
+          };
+
+          card.innerHTML = `
+            ${memo.is_pinned ? '📌 <b style="color:var(--primary); font-size:0.75rem;">고정됨</b><br>' : ""}
+            <span class="badge">${memo.category || "일반"}</span>
+            <h4 style="margin:6px 0;">${memo.title}</h4>
+            <div class="script-box">${memo.rich_content || memo.script || "대본 없음"}</div>
+            <div style="font-size:0.75rem; color:#2b8a3e; margin-top:4px;">⏱️ 약 ${estSeconds}초 (${(memo.script || "").length}자)</div>
+            
+            ${
+              memo.video_url
+                ? `
+              <div class="video-preview-wrapper">
+                <div class="video-preview-btn" onclick="toggleVideoPreview('${memo.id}')">▶️ 영상 미리보기 (클릭/토글)</div>
+                <div id="preview-popup-${memo.id}" class="video-preview-popup">
+                  <span class="preview-close-btn" onclick="toggleVideoPreview('${memo.id}')">✕ 닫기</span>
+                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:30px; text-align:center;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[새 창에서 영상 보기]</a></div>`}
+                </div>
+              </div>`
+                : ""
+            }
+
+            <div style="display:flex; gap:4px; margin-top:8px;">
+              <button style="font-size:0.7rem; padding:2px 6px;" onclick="openReelsModal('${memo.title}', \`${memo.script || ""}\`, '${memo.bgm_title || ""}')">📱 9:16뷰어</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#4a90e2;" onclick="openCommentModal('${memo.id}')">💬 댓글</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#7f8c8d;" onclick="openHistoryModal('${memo.id}')">📜 히스토리</button>
+              <button style="font-size:0.7rem; padding:2px 6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 수정</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; font-size:0.75rem; color:#888;">
+              <span>✍️ ${memo.author || "익명"}</span>
+              <div>
+                <button style="width:auto; padding:2px 6px;" onclick="likeMemo('${memo.id}')" data-vote-id="${memo.id}">👍 ${memo.likes || 0}</button>
+                <button style="width:auto; padding:2px 6px; background:#e74c3c;" onclick="deleteMemo('${memo.id}')">🗑️</button>
+              </div>
+            </div>
+          `;
+          colEl.appendChild(card);
+        });
+      }
+
+      function renderCanvas(memos) {
+        const container = document.getElementById("canvasContainer");
+        container.querySelectorAll(".canvas-card").forEach((c) => c.remove());
+
+        memos.forEach((memo, index) => {
+          memosCache[memo.id] = memo;
+          const card = document.createElement("div");
+          card.className = "canvas-card";
+          card.dataset.id = memo.id;
+          card.id = `card-${memo.id}`;
+          card.tabIndex = 0;
+          card.style.left = `${memo.pos_x || 100 + (index % 4) * 320}px`;
+          card.style.top = `${memo.pos_y || 100 + Math.floor(index / 4) * 260}px`;
+
+          card.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span class="badge">${memo.category || "#아이디어"}</span>
+              <span style="font-size:0.7rem;">✍️ ${memo.author || "익명"}</span>
+            </div>
+            <h4 style="margin:4px 0;">${memo.title}</h4>
+            <div class="script-box" style="max-height:80px;">${memo.rich_content || memo.script || ""}</div>
+          `;
+
+          makeDraggable(card);
+
+          card.onclick = (e) => {
+            e.stopPropagation();
+            activeSelectedMemoId = memo.id;
+            activeSelectedElement = card;
+            highlightSelectedCard(memo.id, card);
+          };
+
+          container.appendChild(card);
+        });
+      }
+
+      socket.on("cursor:moved", ({ name, x, y }) => {
+        let cursorEl = document.getElementById(`cursor-${name}`);
+        if (!cursorEl) {
+          cursorEl = document.createElement("div");
+          cursorEl.id = `cursor-${name}`;
+          cursorEl.className = "remote-cursor";
+          cursorEl.style.background = "#e1306c";
+          cursorEl.innerText = name;
+          document.getElementById("canvasContainer").appendChild(cursorEl);
+        }
+        cursorEl.style.left = `${x}px`;
+        cursorEl.style.top = `${y}px`;
+      });
+
+      socket.on("board:deleted", () => loadBoards());
+      socket.on("memo:updated", () => loadMemos());
+      socket.on("drawing:stroke", (s) => {
+        if (!ctx) return;
+        ctx.beginPath();
+        ctx.moveTo(s.x1, s.y1);
+        ctx.lineTo(s.x2, s.y2);
+        if (s.tool === "eraser") {
+          ctx.globalCompositeOperation = "destination-out";
+          ctx.lineWidth = 25;
+        } else {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.strokeStyle = s.color;
+          ctx.lineWidth = 4;
+        }
+        ctx.lineCap = "round";
+        ctx.stroke();
+      });
+      socket.on(
+        "drawing:cleared",
+        () => ctx && ctx.clearRect(0, 0, pCanvas.width, pCanvas.height),
+      );
+      socket.on("canvas:resized", ({ width, height }) =>
+        applyCanvasSize(width, height),
+      );
+    </script>
+
+    <!-- 통합 확장 스크립트 모듈 -->
+    <script>
+      (function () {
+        "use strict";
+
+        const state = {
+          isGridSnapEnabled: true,
+          gridSize: 20,
+          history: [],
+          votes: {},
+          activeUsers: [
+            { id: "u1", name: "김철수", color: "#FF5722", x: 150, y: 200 },
+            { id: "u2", name: "이영희", color: "#2196F3", x: 400, y: 350 },
+          ],
+        };
+
+        function initGridSnapToggle() {
+          const btn = document.createElement("button");
+          btn.id = "grid-snap-toggle-btn";
+          btn.innerText = "🧲 그리드 스냅: ON";
+          btn.style.cssText = `
+            position: fixed; bottom: 20px; right: 20px; z-index: 9999; width: auto;
+            padding: 8px 14px; background: #222; color: #fff; border: 1px solid #444;
+            border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: bold;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+          `;
+          btn.onclick = () => {
+            state.isGridSnapEnabled = !state.isGridSnapEnabled;
+            btn.innerText = `🧲 그리드 스냅: ${state.isGridSnapEnabled ? "ON" : "OFF"}`;
+            btn.style.background = state.isGridSnapEnabled ? "#222" : "#666";
+          };
+          document.body.appendChild(btn);
+        }
+
+        window.FigmaExt = {
+          getSnappedPos(pos) {
+            if (!state.isGridSnapEnabled) return pos;
+            return Math.round(pos / state.gridSize) * state.gridSize;
+          },
+
+          focusElement(element) {
+            if (!element) return;
+            element.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "center",
+            });
+            element.style.transition = "transform 0.2s, box-shadow 0.2s";
+            const origTransform = element.style.transform;
+            element.style.transform = `${origTransform} scale(1.05)`;
+            element.style.boxShadow = "0 0 15px rgba(225, 48, 108, 0.8)";
+            setTimeout(() => {
+              element.style.transform = origTransform;
+              element.style.boxShadow = "";
+            }, 600);
+          },
+
+          addVote(cardId) {
+            state.votes[cardId] = (state.votes[cardId] || 0) + 1;
+            const badge = document.querySelector(`[data-vote-id="${cardId}"]`);
+            if (badge) badge.innerText = `👍 ${state.votes[cardId]}`;
+          },
+
+          saveSnapshot(actionName) {
+            state.history.push({
+              time: new Date().toLocaleTimeString(),
+              action: actionName,
+              htmlState:
+                document.getElementById("canvasContainer")?.innerHTML || "",
+            });
+            if (state.history.length > 20) state.history.shift();
+          },
+        };
+
+        function renderLiveCursors() {
+          let layer = document.getElementById("figma-live-cursors");
+          if (!layer) {
+            layer = document.createElement("div");
+            layer.id = "figma-live-cursors";
+            layer.style.cssText =
+              "position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:9998;";
+            document.body.appendChild(layer);
+          }
+          layer.innerHTML = state.activeUsers
+            .map(
+              (u) =>
+                `<div style="position:absolute; left:${u.x}px; top:${u.y}px; transition:all 0.3s ease;"><svg width="15" height="15" viewBox="0 0 24 24" fill="${u.color}"><path d="M0 0l16 12-7 2-2 7z"/></svg><span style="background:${u.color}; color:#fff; font-size:10px; padding:2px 6px; border-radius:8px; white-space:nowrap;">${u.name}</span></div>`,
+            )
+            .join("");
+        }
+
+        function initDragAndDrop() {
+          window.addEventListener("dragover", (e) => e.preventDefault());
+          window.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const files = e.dataTransfer.files;
+            if (!files.length) return;
+
+            Array.from(files).forEach((file) => {
+              const url = URL.createObjectURL(file);
+              const card = document.createElement("div");
+              card.className = "canvas-card figma-dropped-card";
+              card.style.cssText = `position:absolute; left:${e.clientX}px; top:${e.clientY}px; z-index:1000; box-shadow:0 4px 10px rgba(0,0,0,0.1);`;
+
+              if (file.type.startsWith("image/")) {
+                card.innerHTML = `<img src="${url}" style="max-width:200px; border-radius:4px; display:block;">`;
+              } else if (file.type.startsWith("video/")) {
+                card.innerHTML = `<video src="${url}" controls style="max-width:220px; border-radius:4px; display:block;"></video>`;
+              }
+              const canvasContainer =
+                document.getElementById("canvasContainer") || document.body;
+              canvasContainer.appendChild(card);
+              if (typeof makeDraggable === "function") makeDraggable(card);
+              window.FigmaExt.saveSnapshot("File Dropped");
+            });
+          });
+        }
+
+        function initSearchUI() {
+          const searchInput = document.createElement("input");
+          searchInput.type = "text";
+          searchInput.placeholder = "🔍 검색...";
+          searchInput.style.cssText = `
+            position: fixed; top: 12px; right: 380px; z-index: 9999; width: 140px;
+            padding: 4px 10px; border: 1px solid var(--border); border-radius: 16px; font-size: 12px; outline: none;
+          `;
+          searchInput.oninput = (e) => {
+            const keyword = e.target.value.toLowerCase();
+            document
+              .querySelectorAll(".card, .canvas-card, .sticky-note")
+              .forEach((el) => {
+                const text = el.innerText.toLowerCase();
+                if (!keyword || text.includes(keyword)) {
+                  el.style.opacity = "1";
+                  el.style.filter = "none";
+                } else {
+                  el.style.opacity = "0.2";
+                  el.style.filter = "grayscale(100%)";
+                }
+              });
+          };
+          document.body.appendChild(searchInput);
+        }
+
+        function initShortcutModal() {
+          const modal = document.createElement("div");
+          modal.id = "figma-shortcut-modal";
+          modal.style.cssText = `
+            display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%);
+            background:#222; color:#fff; padding:20px; border-radius:12px; z-index:10000;
+            box-shadow:0 10px 25px rgba(0,0,0,0.5); font-family:sans-serif; width:300px;
+          `;
+          modal.innerHTML = `
+            <h3 style="margin-top:0; font-size:16px; color:#e1306c;">⌨️ 단축키 안내</h3>
+            <ul style="padding-left:20px; font-size:13px; line-height:1.8;">
+              <li><b>?</b> : 단축키 안내 창 켜기/끄기</li>
+              <li><b>Shift + 클릭</b> : 다중 선택</li>
+              <li><b>D</b> : 다크모드 토글</li>
+            </ul>
+            <button onclick="this.parentElement.style.display='none'" style="width:100%; padding:6px; background:#444; color:#fff; border:none; border-radius:4px; cursor:pointer;">닫기</button>
+          `;
+          document.body.appendChild(modal);
+
+          window.addEventListener("keydown", (e) => {
+            if (e.key === "?") {
+              modal.style.display =
+                modal.style.display === "none" ? "block" : "none";
+            } else if (
+              e.key.toLowerCase() === "d" &&
+              e.target.tagName !== "INPUT" &&
+              e.target.tagName !== "TEXTAREA"
+            ) {
+              if (typeof window.toggleDarkMode === "function")
+                window.toggleDarkMode();
+            }
+          });
+        }
+
+        function initMultiSelectAndEvents() {
+          let selectedElements = [];
+
+          document.addEventListener("click", (e) => {
+            const card = e.target.closest(".card, .canvas-card, .sticky-note");
+            if (!card) return;
+
+            if (e.shiftKey) {
+              if (selectedElements.includes(card)) {
+                selectedElements = selectedElements.filter((el) => el !== card);
+                card.classList.remove("selected");
+              } else {
+                selectedElements.push(card);
+                card.classList.add("selected");
+              }
+            }
+          });
+
+          document.addEventListener("dblclick", (e) => {
+            const card = e.target.closest(".card, .canvas-card, .sticky-note");
+            if (card) window.FigmaExt.focusElement(card);
+          });
+        }
+
+        window.addEventListener("DOMContentLoaded", () => {
+          initGridSnapToggle();
+          initDragAndDrop();
+          initSearchUI();
+          initShortcutModal();
+          initMultiSelectAndEvents();
+          renderLiveCursors();
+        });
+      })();
+    </script>
   </body>
 </html>
