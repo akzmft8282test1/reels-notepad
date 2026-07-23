@@ -96,6 +96,7 @@ app.get("/api/users", async (req, res) => {
   res.json(data);
 });
 
+// 게시판 목록 조회
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -105,6 +106,7 @@ app.get("/api/boards", async (req, res) => {
   res.json(data);
 });
 
+// 게시판 생성 API
 app.post("/api/boards", async (req, res) => {
   if (!req.session.user || req.session.user.role === "Viewer")
     return res.status(403).json({ message: "권한이 없습니다." });
@@ -120,6 +122,50 @@ app.post("/api/boards", async (req, res) => {
     `게시판 생성: ${name}`,
   );
   res.json(data[0]);
+});
+
+// 🎯 [게시판 삭제 API] Admin 및 관리자 전용 삭제 동작
+app.delete("/api/boards/:id", async (req, res) => {
+  if (
+    !req.session.user ||
+    (req.session.user.role !== "Admin" && req.session.user.role !== "Member")
+  ) {
+    return res
+      .status(403)
+      .json({ success: false, message: "게시판 삭제 권한이 없습니다." });
+  }
+  const boardId = req.params.id;
+  try {
+    await supabase.from("memos").delete().eq("board_id", boardId);
+    await supabase.from("canvas_drawings").delete().eq("board_id", boardId);
+    const { error } = await supabase.from("boards").delete().eq("id", boardId);
+    if (error) throw error;
+
+    await logAction(
+      req.session.user.username,
+      "DELETE_BOARD",
+      `게시판 삭제: ${boardId}`,
+    );
+    io.emit("board:deleted", boardId);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// 캔버스 크기 저장 API
+app.post("/api/boards/size", async (req, res) => {
+  const { boardId, width, height } = req.body;
+  try {
+    await supabase
+      .from("boards")
+      .update({ canvas_width: width, canvas_height: height })
+      .eq("id", boardId);
+    io.to(boardId).emit("canvas:resized", { width, height });
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.get("/api/memos/:boardId", async (req, res) => {
@@ -323,5 +369,7 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎬 릴스 스튜디오 실행 중: http://localhost:${PORT}`);
+  console.log(
+    `🎬 릴스 협업 노트패드 스튜디오 실행 중: http://localhost:${PORT}`,
+  );
 });

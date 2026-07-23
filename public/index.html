@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🎬 릴스 대회 아이디어 & 대본 협업 스튜디오</title>
+    <title>🎬 릴스 대회 아이디어 & 대본 협업 스튜디오 Pro</title>
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- Quill.js 서식 에디터 -->
@@ -69,7 +69,6 @@
         border-radius: 12px;
       }
 
-      /* 칸반 보드 레이아웃 */
       .kanban-container {
         display: flex;
         gap: 15px;
@@ -127,7 +126,6 @@
         white-space: pre-wrap;
       }
 
-      /* 동적 확장 무한 캔버스 뷰포트 */
       #canvasView {
         display: none;
         width: 100vw;
@@ -137,7 +135,7 @@
       }
       #canvasContainer {
         width: 3000px;
-        height: 3000px; /* 초기 크기 (매초 가로세로 1000px씩 증가) */
+        height: 3000px;
         background-color: var(--canvas-bg);
         background-image: radial-gradient(
           var(--grid-color) 1.5px,
@@ -170,7 +168,6 @@
         outline: none;
       }
 
-      /* 우클릭 컨텍스트 메뉴 */
       #contextMenu {
         display: none;
         position: fixed;
@@ -195,14 +192,17 @@
         color: #fff;
       }
 
-      /* 툴바 커스텀 */
       .tool-btn.active {
         background: var(--primary) !important;
         color: white !important;
         font-weight: bold;
       }
+      .resize-btn-on {
+        background: #27ae60 !important;
+        color: white !important;
+        font-weight: bold;
+      }
 
-      /* 모달 UI */
       .modal-bg {
         display: none;
         position: fixed;
@@ -224,19 +224,6 @@
         max-width: 500px;
         max-height: 85vh;
         overflow-y: auto;
-      }
-      .reels-phone-frame {
-        width: 270px;
-        height: 480px;
-        background: #000;
-        color: #fff;
-        border-radius: 20px;
-        padding: 15px;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        margin: 0 auto;
       }
 
       .sidebar {
@@ -383,13 +370,28 @@
         "
       >
         <h2 id="currentBoardTitle">기본 게시판</h2>
-        <button
-          id="addMemoBtn"
-          style="width: auto"
-          onclick="openMemoEditModal()"
-        >
-          + 아이디어/대본 작성
-        </button>
+
+        <!-- 🎯 대본 유형별 작성 버튼 복원 -->
+        <div style="display: flex; gap: 6px">
+          <button
+            style="width: auto; background: var(--primary)"
+            onclick="openMemoModalWithType('hook')"
+          >
+            ⚡ 3초 후킹 노드
+          </button>
+          <button
+            style="width: auto; background: #3b82f6"
+            onclick="openMemoModalWithType('story')"
+          >
+            📖 스토리 노드
+          </button>
+          <button
+            style="width: auto; background: #10b981"
+            onclick="openMemoModalWithType('custom')"
+          >
+            + 자유 아이디어
+          </button>
+        </div>
       </div>
 
       <div class="kanban-container">
@@ -428,7 +430,7 @@
       </div>
     </div>
 
-    <!-- 2. 동적 무한 캔버스 뷰 -->
+    <!-- 2. 무한 캔버스 뷰 -->
     <div id="canvasView">
       <div
         style="
@@ -483,16 +485,24 @@
           value="#e1306c"
           style="width: 28px; height: 24px; border: none; cursor: pointer"
         />
+
+        <button
+          id="btnResizeToggle"
+          style="width: auto; padding: 4px 10px; background: #8e44ad"
+          onclick="toggleAutoResize()"
+        >
+          ⚡ 캔버스 크기 늘리기: OFF 🔴
+        </button>
         <span
           id="canvasSizeInfo"
           style="
             font-size: 0.75rem;
             align-self: center;
             font-family: monospace;
-            margin-left: 6px;
+            margin-left: 4px;
             color: #555;
           "
-          >크기: 3000x3000px</span
+          >3000x3000px</span
         >
         <button
           style="width: auto; padding: 4px 8px; background: #e74c3c"
@@ -502,12 +512,11 @@
         </button>
       </div>
       <div id="canvasContainer">
-        <!-- 2D HTML5 캔버스 엔진 -->
         <canvas id="paintCanvas" width="3000" height="3000"></canvas>
       </div>
     </div>
 
-    <!-- 보장된 우클릭 컨텍스트 메뉴 -->
+    <!-- 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
       <div onclick="contextAction('cut')">
         <span>✂️ 잘라내기</span><small style="opacity: 0.6">Ctrl+X</small>
@@ -545,7 +554,7 @@
         <label>대본 (서식 편집 지원)</label>
         <div
           id="quillEditor"
-          style="height: 120px; background: #fff; color: #000; margin-top: 6px"
+          style="height: 140px; background: #fff; color: #000; margin-top: 6px"
         ></div>
 
         <div style="display: flex; gap: 10px; margin-top: 15px">
@@ -592,16 +601,19 @@
       let currentTool = "pan";
       let memosCache = {};
 
-      // 캔버스 크기 및 드로잉 변수
-      let canvasWidth = 3000;
-      let canvasHeight = 3000;
+      let canvasWidth =
+        parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
+      let canvasHeight =
+        parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
+      let isAutoResizing = false;
+      let resizeTimer = null;
+
       let pCanvas = null;
       let ctx = null;
       let isDrawing = false;
       let lastX = 0,
         lastY = 0;
 
-      // Pan 좌표
       let isPanning = false;
       let panStart = { x: 0, y: 0 };
       let canvasPos = { x: 0, y: 0 };
@@ -612,33 +624,8 @@
         pCanvas = document.getElementById("paintCanvas");
         ctx = pCanvas.getContext("2d");
 
-        // 1초에 가로세로 1000px씩 무한 확장 타이머
-        setInterval(() => {
-          if (activeView === "canvas") {
-            canvasWidth += 1000;
-            canvasHeight += 1000;
+        applyCanvasSize(canvasWidth, canvasHeight);
 
-            const container = document.getElementById("canvasContainer");
-            container.style.width = `${canvasWidth}px`;
-            container.style.height = `${canvasHeight}px`;
-
-            // 기존 그린 그림 백업 후 크기 확장
-            const imgData = ctx.getImageData(
-              0,
-              0,
-              pCanvas.width,
-              pCanvas.height,
-            );
-            pCanvas.width = canvasWidth;
-            pCanvas.height = canvasHeight;
-            ctx.putImageData(imgData, 0, 0);
-
-            document.getElementById("canvasSizeInfo").innerText =
-              `크기: ${canvasWidth}x${canvasHeight}px`;
-          }
-        }, 1000);
-
-        // HTML5 Canvas 직접 지우개/펜 드로잉 로직
         pCanvas.addEventListener("mousedown", (e) => {
           if (currentTool !== "pen" && currentTool !== "eraser") return;
           isDrawing = true;
@@ -658,7 +645,6 @@
           ctx.lineTo(currentX, currentY);
 
           if (currentTool === "eraser") {
-            // ★ 진짜 지우개: 그려진 펜 선만 부분 투명하게 지움
             ctx.globalCompositeOperation = "destination-out";
             ctx.lineWidth = 25;
             ctx.lineCap = "round";
@@ -691,7 +677,6 @@
           isDrawing = false;
         });
 
-        // Pan(캔버스 이동) 이벤트
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
@@ -721,10 +706,8 @@
           }
         });
 
-        // 보장된 우클릭 컨텍스트 메뉴 이벤트
         window.addEventListener("contextmenu", (e) => {
-          e.preventDefault(); // 기본 브라우저 우클릭 강제 차단
-
+          e.preventDefault();
           const cardEl = e.target.closest(".card, .canvas-card");
           const contextMenu = document.getElementById("contextMenu");
 
@@ -743,7 +726,6 @@
           document.getElementById("contextMenu").style.display = "none";
         });
 
-        // Delete 키 선택 삭제 이벤트
         window.addEventListener("keydown", (e) => {
           const activeTag = document.activeElement
             ? document.activeElement.tagName.toLowerCase()
@@ -767,6 +749,58 @@
 
         init();
       };
+
+      function toggleAutoResize() {
+        isAutoResizing = !isAutoResizing;
+        const btn = document.getElementById("btnResizeToggle");
+
+        if (isAutoResizing) {
+          btn.classList.add("resize-btn-on");
+          btn.innerText = "⚡ 캔버스 크기 늘리기: ON 🟢 (클릭 시 멈춤)";
+
+          resizeTimer = setInterval(() => {
+            canvasWidth += 1000;
+            canvasHeight += 1000;
+            applyCanvasSize(canvasWidth, canvasHeight);
+            saveCanvasSize(canvasWidth, canvasHeight);
+          }, 1000);
+        } else {
+          btn.classList.remove("resize-btn-on");
+          btn.innerText = "⚡ 캔버스 크기 늘리기: OFF 🔴";
+          if (resizeTimer) clearInterval(resizeTimer);
+          saveCanvasSize(canvasWidth, canvasHeight);
+        }
+      }
+
+      function applyCanvasSize(w, h) {
+        const container = document.getElementById("canvasContainer");
+        container.style.width = `${w}px`;
+        container.style.height = `${h}px`;
+
+        if (pCanvas) {
+          const imgData = ctx.getImageData(0, 0, pCanvas.width, pCanvas.height);
+          pCanvas.width = w;
+          pCanvas.height = h;
+          ctx.putImageData(imgData, 0, 0);
+        }
+        document.getElementById("canvasSizeInfo").innerText = `${w}x${h}px`;
+      }
+
+      function saveCanvasSize(w, h) {
+        localStorage.setItem("savedCanvasWidth", w);
+        localStorage.setItem("savedCanvasHeight", h);
+        if (currentBoardId) {
+          fetch("/api/boards/size", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              boardId: currentBoardId,
+              width: w,
+              height: h,
+            }),
+          });
+        }
+      }
 
       async function init() {
         const res = await fetch("/api/me");
@@ -855,6 +889,27 @@
         }
       }
 
+      // 🎯 [게시판 삭제 기능] Admin / 관리자 삭제 및 프론트엔드 연동
+      async function deleteBoard(boardId, boardName) {
+        if (
+          !confirm(
+            `정말로 [${boardName}] 게시판과 내부 모든 메모를 삭제하시겠습니까?`,
+          )
+        )
+          return;
+
+        const res = await fetch(`/api/boards/${boardId}`, { method: "DELETE" });
+        const data = await res.json();
+
+        if (data.success) {
+          alert("게시판이 성공적으로 삭제되었습니다.");
+          currentBoardId = null;
+          loadBoards();
+        } else {
+          alert(data.message || "삭제 실패");
+        }
+      }
+
       function switchView(view) {
         activeView = view;
         if (view === "kanban") {
@@ -911,18 +966,43 @@
 
         boards.forEach((board, idx) => {
           const li = document.createElement("li");
-          li.innerText = board.name;
-          li.style.padding = "8px";
-          li.style.cursor = "pointer";
-          li.onclick = () => selectBoard(board);
-          if (idx === 0 && !currentBoardId) selectBoard(board);
+          li.style.display = "flex";
+          li.style.justifyContent = "space-between";
+          li.style.alignItems = "center";
+          li.style.padding = "6px 8px";
+
+          li.innerHTML = `
+            <span style="cursor:pointer; flex:1;" onclick="selectBoardById('${board.id}', '${board.name}')">${board.name}</span>
+            ${
+              currentUser?.role === "Admin" || currentUser?.role === "Member"
+                ? `
+              <button style="width:auto; padding:2px 6px; background:#e74c3c; font-size:0.75rem;" onclick="deleteBoard('${board.id}', '${board.name}')">🗑️</button>
+            `
+                : ""
+            }
+          `;
+
+          if ((idx === 0 && !currentBoardId) || currentBoardId === board.id) {
+            selectBoard(board);
+          }
           listEl.appendChild(li);
         });
+      }
+
+      function selectBoardById(id, name) {
+        selectBoard({ id, name });
       }
 
       function selectBoard(board) {
         currentBoardId = board.id;
         document.getElementById("currentBoardTitle").innerText = board.name;
+
+        if (board.canvas_width && board.canvas_height) {
+          canvasWidth = board.canvas_width;
+          canvasHeight = board.canvas_height;
+          applyCanvasSize(canvasWidth, canvasHeight);
+        }
+
         socket.emit("board:join", board.id);
         loadMemos();
       }
@@ -1028,9 +1108,31 @@
         });
       }
 
-      function openMemoEditModal() {
+      // 🎯 대본 유형별 모달 오픈 함수 복원
+      function openMemoModalWithType(type) {
+        document.getElementById("editMemoId").value = "";
+
+        if (type === "hook") {
+          document.getElementById("editTitle").value = "⚡ 3초 후킹 대본 노드";
+          document.getElementById("editCategory").value = "#후킹";
+          quill.clipboard.dangerouslyPasteHTML(
+            "<p><strong style='color:rgb(225,48,108);'>[3초 후킹]</strong>: 아직도 ~하시나요?</p><p>[본문]: </p>",
+          );
+        } else if (type === "story") {
+          document.getElementById("editTitle").value = "📖 스토리텔링 노드";
+          document.getElementById("editCategory").value = "#스토리";
+          quill.clipboard.dangerouslyPasteHTML(
+            "<p><strong>[도입]</strong>: 완벽한 대본을 작성해보세요.</p><p>[전개]: </p>",
+          );
+        } else {
+          document.getElementById("editTitle").value = "💡 자유 아이디어 노드";
+          document.getElementById("editCategory").value = "#아이디어";
+          quill.clipboard.dangerouslyPasteHTML("<p>[아이디어 설명]: </p>");
+        }
+
         document.getElementById("memoModal").style.display = "flex";
       }
+
       function saveMemoModal() {
         const memoData = {
           board_id: currentBoardId,
@@ -1051,6 +1153,7 @@
         }
       }
 
+      socket.on("board:deleted", () => loadBoards());
       socket.on("memo:updated", () => loadMemos());
       socket.on("drawing:stroke", (s) => {
         ctx.beginPath();
@@ -1069,6 +1172,9 @@
       });
       socket.on("drawing:cleared", () =>
         ctx.clearRect(0, 0, pCanvas.width, pCanvas.height),
+      );
+      socket.on("canvas:resized", ({ width, height }) =>
+        applyCanvasSize(width, height),
       );
     </script>
   </body>
