@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🎬 릴스 대회 아이디어 & 대본 협업 스튜디오 Pro</title>
+    <title>🎬 릴스 대회 아이디어 & 피그마 스튜디오 Pro</title>
     <script src="/socket.io/socket.io.js"></script>
 
     <!-- Quill.js 서식 에디터 -->
@@ -83,6 +83,7 @@
         border-radius: 8px;
         padding: 12px;
         border: 1px dashed var(--border);
+        position: relative;
       }
       .kanban-col-title {
         font-weight: bold;
@@ -133,7 +134,7 @@
         margin-top: 4px;
       }
 
-      /* 🎬 릴스/유튜브 호버 영상 미리보기 */
+      /* 🎬 1. 링크 클릭 및 호버 시 칸에 제한받지 않는 독립 레이어 (Z-Index 최상위) */
       .video-preview-wrapper {
         position: relative;
         display: inline-block;
@@ -144,27 +145,41 @@
         color: #3897f0;
         cursor: pointer;
         font-weight: bold;
+        text-decoration: underline;
       }
       .video-preview-popup {
         display: none;
-        position: absolute;
-        bottom: 25px;
-        left: 0;
-        width: 220px;
-        height: 380px;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 300px;
+        height: 520px;
         background: #000;
-        border-radius: 12px;
+        border-radius: 16px;
         overflow: hidden;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
-        z-index: 1000;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+        z-index: 999999 !important;
+        border: 2px solid var(--primary);
       }
-      .video-preview-wrapper:hover .video-preview-popup {
+      .video-preview-popup.active {
         display: block;
       }
       .video-preview-popup iframe {
         width: 100%;
         height: 100%;
         border: none;
+      }
+      .preview-close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 4px 8px;
+        border-radius: 20px;
+        cursor: pointer;
+        z-index: 1000000;
       }
 
       #canvasView {
@@ -208,6 +223,63 @@
         overflow: auto;
         outline: none;
       }
+      .canvas-card.locked {
+        border-style: dashed;
+        opacity: 0.8;
+      }
+
+      /* 🎨 피그마 주요기능: 멀티플레이어 커서 표시 */
+      .remote-cursor {
+        position: absolute;
+        pointer-events: none;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: white;
+        white-space: nowrap;
+      }
+      .remote-cursor::before {
+        content: "↖";
+        font-size: 1.2rem;
+      }
+
+      /* 🎨 피그마 주요기능: 피그잼 스티키 노트 */
+      .sticky-note {
+        position: absolute;
+        width: 180px;
+        height: 180px;
+        padding: 12px;
+        border-radius: 4px;
+        box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.15);
+        z-index: 12;
+        font-weight: bold;
+        border: none;
+        resize: both;
+      }
+
+      /* 🎨 피그마 주요기능: 미니맵 UI */
+      #minimap {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 160px;
+        height: 120px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid var(--border);
+        border-radius: 8px;
+        z-index: 500;
+        overflow: hidden;
+      }
+      #minimapViewport {
+        position: absolute;
+        border: 1.5px solid var(--primary);
+        background: rgba(225, 48, 108, 0.2);
+      }
 
       #contextMenu {
         display: none;
@@ -233,7 +305,6 @@
         color: #fff;
       }
 
-      /* 댓글 `@` 멘션 드롭다운 */
       #mentionDropdown {
         display: none;
         position: absolute;
@@ -342,7 +413,6 @@
         cursor: pointer;
       }
 
-      /* 숨겨진 어드민 콘솔 복원 */
       #adminConsole {
         display: none;
         position: fixed;
@@ -361,7 +431,7 @@
   </head>
   <body>
     <header>
-      <div class="logo">🎬 릴스 메모장 Pro</div>
+      <div class="logo">🎬 릴스 메모장 Pro + Figma</div>
       <div class="header-right">
         <button
           onclick="switchView('kanban')"
@@ -524,7 +594,7 @@
       </div>
     </div>
 
-    <!-- 2. 무한 캔버스 뷰 -->
+    <!-- 2. 무한 캔버스 뷰 + 피그마 툴바 -->
     <div id="canvasView">
       <div
         style="
@@ -539,6 +609,7 @@
           border-radius: 8px;
           border: 1px solid #ccc;
           color: #000;
+          flex-wrap: wrap;
         "
       >
         <button
@@ -547,7 +618,7 @@
           style="width: auto; padding: 4px 10px"
           onclick="setTool('pan')"
         >
-          🖐️ 캔버스 이동
+          🖐️ 이동(H)
         </button>
         <button
           id="btnSelect"
@@ -555,7 +626,7 @@
           style="width: auto; padding: 4px 10px"
           onclick="setTool('select')"
         >
-          ↖️ 선택/편집
+          ↖️ 선택(V)
         </button>
         <button
           id="btnPen"
@@ -563,7 +634,7 @@
           style="width: auto; padding: 4px 10px"
           onclick="setTool('pen')"
         >
-          ✏️ 펜
+          ✏️ 펜(P)
         </button>
         <button
           id="btnEraser"
@@ -573,6 +644,32 @@
         >
           🧹 지우개
         </button>
+
+        <!-- 🎨 피그마 TOP 10 기능 도구 모음 -->
+        <button
+          style="width: auto; padding: 4px 10px; background: #f39c12"
+          onclick="addShape('rect')"
+        >
+          🟦 사각형
+        </button>
+        <button
+          style="width: auto; padding: 4px 10px; background: #9b59b6"
+          onclick="addShape('circle')"
+        >
+          🟡 원형
+        </button>
+        <button
+          style="
+            width: auto;
+            padding: 4px 10px;
+            background: #f1c40f;
+            color: #000;
+          "
+          onclick="addStickyNote('#fef08a')"
+        >
+          🟨 스티키노트
+        </button>
+
         <input
           type="color"
           id="penColor"
@@ -585,7 +682,7 @@
           style="width: auto; padding: 4px 10px; background: #8e44ad"
           onclick="toggleAutoResize()"
         >
-          ⚡ 캔버스 크기 늘리기: OFF 🔴
+          ⚡ 캔버스 자동확장: OFF 🔴
         </button>
         <span
           id="canvasSizeInfo"
@@ -605,8 +702,14 @@
           그림 지우기
         </button>
       </div>
+
       <div id="canvasContainer">
         <canvas id="paintCanvas" width="3000" height="3000"></canvas>
+      </div>
+
+      <!-- 🎨 피그마 미니맵 (Minimap) -->
+      <div id="minimap">
+        <div id="minimapViewport"></div>
       </div>
     </div>
 
@@ -618,15 +721,19 @@
       <div onclick="contextAction('copy')">
         <span>📋 대본 복사</span><small style="opacity: 0.6">Ctrl+C</small>
       </div>
-      <div onclick="contextAction('paste')">
-        <span>📥 대본 붙여넣기</span><small style="opacity: 0.6">Ctrl+V</small>
+      <div onclick="contextAction('duplicate')">
+        <span>👯 복제하기</span><small style="opacity: 0.6">Ctrl+D</small>
       </div>
+      <div onclick="contextAction('paste')">
+        <span>📥 붙여넣기</span><small style="opacity: 0.6">Ctrl+V</small>
+      </div>
+      <div onclick="contextAction('lock')"><span>🔒 개체 잠금/해제</span></div>
       <div onclick="contextAction('delete')" style="color: #e74c3c">
         <span>🗑️ 삭제하기</span><small style="opacity: 0.6">Del</small>
       </div>
     </div>
 
-    <!-- 메모 작성/수정 모달 (복원 필드 탑재) -->
+    <!-- 메모 작성/수정 모달 -->
     <div id="memoModal" class="modal-bg">
       <div class="modal">
         <h3>📝 메모/대본 작성</h3>
@@ -688,9 +795,7 @@
             border-radius: 6px;
           "
         ></div>
-
         <div id="mentionDropdown"></div>
-
         <textarea
           id="newCommentText"
           placeholder="댓글 입력 (@ 입력 시 팀원 자동완성)"
@@ -797,7 +902,7 @@
       </div>
     </div>
 
-    <!-- 어드민 콘솔 복원 -->
+    <!-- 어드민 콘솔 -->
     <div id="adminConsole">
       <div
         style="
@@ -866,6 +971,7 @@
       let isPanning = false;
       let panStart = { x: 0, y: 0 };
       let canvasPos = { x: 0, y: 0 };
+      let zoomLevel = 1.0;
 
       function getEmbedUrl(url) {
         if (!url) return null;
@@ -882,10 +988,20 @@
         return null;
       }
 
+      // 🎬 1. 영상 미리보기 토글 (칸의 영역 제한을 받지 않고 독립레이어로 팝업)
+      function toggleVideoPreview(memoId) {
+        const popup = document.getElementById(`preview-popup-${memoId}`);
+        if (popup) {
+          const isActive = popup.classList.contains("active");
+          document
+            .querySelectorAll(".video-preview-popup")
+            .forEach((p) => p.classList.remove("active"));
+          if (!isActive) popup.classList.add("active");
+        }
+      }
+
       window.onload = () => {
         quill = new Quill("#quillEditor", { theme: "snow" });
-
-        // 🎯 자막 가독성 실시간 검사 복원
         quill.on("text-change", () => checkScriptWarning(quill.getText()));
 
         pCanvas = document.getElementById("paintCanvas");
@@ -897,15 +1013,15 @@
           if (currentTool !== "pen" && currentTool !== "eraser") return;
           isDrawing = true;
           const rect = pCanvas.getBoundingClientRect();
-          lastX = e.clientX - rect.left;
-          lastY = e.clientY - rect.top;
+          lastX = (e.clientX - rect.left) / zoomLevel;
+          lastY = (e.clientY - rect.top) / zoomLevel;
         });
 
         pCanvas.addEventListener("mousemove", (e) => {
           if (!isDrawing) return;
           const rect = pCanvas.getBoundingClientRect();
-          const currentX = e.clientX - rect.left;
-          const currentY = e.clientY - rect.top;
+          const currentX = (e.clientX - rect.left) / zoomLevel;
+          const currentY = (e.clientY - rect.top) / zoomLevel;
 
           ctx.beginPath();
           ctx.moveTo(lastX, lastY);
@@ -947,8 +1063,40 @@
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
+        // 🎨 피그마 기능: Ctrl + 휠 캔버스 Zoom 확대/축소
+        canvasView.addEventListener(
+          "wheel",
+          (e) => {
+            if (e.ctrlKey) {
+              e.preventDefault();
+              zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
+              zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
+              updateCanvasTransform();
+            }
+          },
+          { passive: false },
+        );
+
+        // 🎨 피그마 기능: 실시간 마우스 위치 멀티플레이어 커서 공유
+        canvasView.addEventListener("mousemove", (e) => {
+          if (currentBoardId && currentUser) {
+            const rect = container.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            socket.emit("cursor:move", {
+              boardId: currentBoardId,
+              name: currentUser.name,
+              x,
+              y,
+            });
+          }
+        });
+
         canvasView.addEventListener("mousedown", (e) => {
-          if (currentTool === "pan" && !e.target.closest(".canvas-card")) {
+          if (
+            currentTool === "pan" &&
+            !e.target.closest(".canvas-card, .sticky-note")
+          ) {
             isPanning = true;
             panStart = {
               x: e.clientX - canvasPos.x,
@@ -962,7 +1110,7 @@
           if (isPanning) {
             canvasPos.x = e.clientX - panStart.x;
             canvasPos.y = e.clientY - panStart.y;
-            container.style.transform = `translate(${canvasPos.x}px, ${canvasPos.y}px)`;
+            updateCanvasTransform();
           }
         });
 
@@ -975,7 +1123,7 @@
 
         window.addEventListener("contextmenu", (e) => {
           e.preventDefault();
-          const cardEl = e.target.closest(".card, .canvas-card");
+          const cardEl = e.target.closest(".card, .canvas-card, .sticky-note");
           const contextMenu = document.getElementById("contextMenu");
 
           if (cardEl) {
@@ -993,6 +1141,7 @@
           document.getElementById("contextMenu").style.display = "none";
         });
 
+        // 🎨 피그마 기능: 단축키 지원 (Ctrl+D 복제, Del 삭제, V/H/P 툴 전환)
         window.addEventListener("keydown", (e) => {
           const activeTag = document.activeElement
             ? document.activeElement.tagName.toLowerCase()
@@ -1003,6 +1152,19 @@
             document.activeElement.classList.contains("ql-editor");
 
           if (isEditingText) return;
+
+          if (e.key.toLowerCase() === "v") setTool("select");
+          if (e.key.toLowerCase() === "h") setTool("pan");
+          if (e.key.toLowerCase() === "p") setTool("pen");
+
+          if (
+            e.ctrlKey &&
+            e.key.toLowerCase() === "d" &&
+            activeSelectedMemoId
+          ) {
+            e.preventDefault();
+            contextAction("duplicate");
+          }
 
           if (
             (e.key === "Delete" || e.key === "Backspace") &&
@@ -1017,7 +1179,52 @@
         init();
       };
 
-      // 🎯 [복원] 자막 가독성 검사 함수
+      function updateCanvasTransform() {
+        const container = document.getElementById("canvasContainer");
+        container.style.transform = `translate(${canvasPos.x}px, ${canvasPos.y}px) scale(${zoomLevel})`;
+        updateMinimap();
+      }
+
+      // 🎨 피그마 기능: 미니맵 동기화
+      function updateMinimap() {
+        const viewport = document.getElementById("minimapViewport");
+        const ratioX = 160 / canvasWidth;
+        const ratioY = 120 / canvasHeight;
+
+        viewport.style.width = `${(window.innerWidth / zoomLevel) * ratioX}px`;
+        viewport.style.height = `${(window.innerHeight / zoomLevel) * ratioY}px`;
+        viewport.style.left = `${Math.max(0, -canvasPos.x * ratioX)}px`;
+        viewport.style.top = `${Math.max(0, -canvasPos.y * ratioY)}px`;
+      }
+
+      // 🎨 피그마 기능: 피그잼 스티키 노트 추가
+      function addStickyNote(color) {
+        const id = "sticky-" + Date.now();
+        const note = document.createElement("textarea");
+        note.className = "sticky-note";
+        note.id = id;
+        note.style.background = color;
+        note.style.left = `${200 - canvasPos.x}px`;
+        note.style.top = `${200 - canvasPos.y}px`;
+        note.placeholder = "아이디어 메모...";
+
+        document.getElementById("canvasContainer").appendChild(note);
+      }
+
+      // 🎨 피그마 기능: 기본 도형 그리기
+      function addShape(type) {
+        const shape = document.createElement("div");
+        shape.className = "canvas-card";
+        shape.style.left = `${300 - canvasPos.x}px`;
+        shape.style.top = `${300 - canvasPos.y}px`;
+        shape.style.width = "120px";
+        shape.style.height = "120px";
+        shape.style.background = document.getElementById("penColor").value;
+
+        if (type === "circle") shape.style.borderRadius = "50%";
+        document.getElementById("canvasContainer").appendChild(shape);
+      }
+
       function checkScriptWarning(text) {
         const lines = text.split("\n");
         const hasLongLine = lines.some((l) => l.length > 20);
@@ -1026,7 +1233,6 @@
           : "none";
       }
 
-      // 🎯 [복원] 어드민 콘솔 숨겨진 키 시퀀스 이스터에그
       const secretSequence = [
         "ArrowUp",
         "ArrowDown",
@@ -1110,6 +1316,7 @@
           ctx.putImageData(imgData, 0, 0);
         }
         document.getElementById("canvasSizeInfo").innerText = `${w}x${h}px`;
+        updateMinimap();
       }
 
       function saveCanvasSize(w, h) {
@@ -1228,6 +1435,26 @@
           deleteMemo(activeSelectedMemoId);
           activeSelectedMemoId = null;
           alert("대본이 잘라내기 처리 되었습니다.");
+        } else if (type === "duplicate" && activeSelectedMemoId) {
+          const target = memosCache[activeSelectedMemoId];
+          if (target) {
+            socket.emit("memo:save", {
+              board_id: currentBoardId,
+              title: `${target.title} (사본)`,
+              category: target.category,
+              status: target.status,
+              script: target.script,
+              rich_content: target.rich_content,
+              author: currentUser.name,
+              pos_x: (target.pos_x || 100) + 30,
+              pos_y: (target.pos_y || 100) + 30,
+            });
+          }
+        } else if (type === "lock" && activeSelectedMemoId) {
+          const target = document.querySelector(
+            `#card-${activeSelectedMemoId}`,
+          );
+          if (target) target.classList.toggle("locked");
         } else if (type === "paste") {
           if (!clipboardData) return alert("복사된 대본이 없습니다.");
           socket.emit("memo:save", {
@@ -1388,6 +1615,7 @@
         else renderCanvas(memos);
       }
 
+      // 🎬 칸에 영향 받지 않고 떠오르는 영상 미리보기 탑재 칸반
       function renderKanban(memos) {
         ["아이디어", "대본작성", "촬영예정", "완료"].forEach((status) => {
           document.getElementById(`col-${status}`).innerHTML = "";
@@ -1421,9 +1649,10 @@
               memo.video_url
                 ? `
               <div class="video-preview-wrapper">
-                <div class="video-preview-btn">▶️ 영상 미리보기 (호버)</div>
-                <div class="video-preview-popup">
-                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:15px;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[바로가기]</a></div>`}
+                <div class="video-preview-btn" onclick="toggleVideoPreview('${memo.id}')">▶️ 영상 미리보기 (클릭/토글)</div>
+                <div id="preview-popup-${memo.id}" class="video-preview-popup">
+                  <span class="preview-close-btn" onclick="toggleVideoPreview('${memo.id}')">✕ 닫기</span>
+                  ${embedUrl ? `<iframe src="${embedUrl}" allowfullscreen></iframe>` : `<div style="color:#fff; padding:30px; text-align:center;"><a href="${memo.video_url}" target="_blank" style="color:#3897f0;">[새 창에서 영상 보기]</a></div>`}
                 </div>
               </div>
             `
@@ -1481,7 +1710,8 @@
             offsetLeft = 0,
             offsetTop = 0;
           card.addEventListener("mousedown", (e) => {
-            if (currentTool !== "select") return;
+            if (currentTool !== "select" || card.classList.contains("locked"))
+              return;
             isDraggingCard = true;
             offsetLeft = e.clientX - card.offsetLeft;
             offsetTop = e.clientY - card.offsetTop;
@@ -1489,8 +1719,8 @@
 
           window.addEventListener("mousemove", (e) => {
             if (isDraggingCard && currentTool === "select") {
-              const newX = e.clientX - offsetLeft;
-              const newY = e.clientY - offsetTop;
+              const newX = (e.clientX - offsetLeft) / zoomLevel;
+              const newY = (e.clientY - offsetTop) / zoomLevel;
               card.style.left = `${newX}px`;
               card.style.top = `${newY}px`;
               socket.emit("memo:move", {
@@ -1509,7 +1739,6 @@
         });
       }
 
-      // 🎯 [복원] 기본 대본 양식 자동 삽입
       function openMemoEditModal() {
         document.getElementById("editMemoId").value = "";
         document.getElementById("editTitle").value = "";
@@ -1548,7 +1777,6 @@
         document.getElementById("memoModal").style.display = "flex";
       }
 
-      // 🎯 [복원] BGM 정보 바인딩
       function editMemo(memoId) {
         const memo = memosCache[memoId];
         if (!memo) return;
@@ -1703,6 +1931,21 @@
         a.download = `reels_scripts_${Date.now()}.txt`;
         a.click();
       }
+
+      // 소켓 통신: 피그마 멀티 커서 동기화
+      socket.on("cursor:moved", ({ name, x, y }) => {
+        let cursorEl = document.getElementById(`cursor-${name}`);
+        if (!cursorEl) {
+          cursorEl = document.createElement("div");
+          cursorEl.id = `cursor-${name}`;
+          cursorEl.className = "remote-cursor";
+          cursorEl.style.background = "#e1306c";
+          cursorEl.innerText = name;
+          document.getElementById("canvasContainer").appendChild(cursorEl);
+        }
+        cursorEl.style.left = `${x}px`;
+        cursorEl.style.top = `${y}px`;
+      });
 
       socket.on("board:deleted", () => loadBoards());
       socket.on("memo:updated", () => loadMemos());
