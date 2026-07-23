@@ -88,7 +88,7 @@ app.post("/api/logout", (req, res) => {
   res.json({ success: true });
 });
 
-// 팀원 유저 목록 조회 (@멘션 자동완성용)
+// 팀원 유저 목록 조회
 app.get("/api/users", async (req, res) => {
   const { data, error } = await supabase
     .from("allowed_users")
@@ -156,7 +156,7 @@ app.post("/api/boards", async (req, res) => {
   res.json(data[0]);
 });
 
-// 메모 목록 조회 (휴지통 제외)
+// 메모 목록 조회
 app.get("/api/memos/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -170,7 +170,7 @@ app.get("/api/memos/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// 휴지통 및 복구 API
+// 휴지통 및 복구
 app.get("/api/trash/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const sixtyDaysAgo = new Date(
@@ -201,7 +201,7 @@ app.post("/api/memos/restore", async (req, res) => {
   res.json({ success: true });
 });
 
-// 칸반 드래그 이동 API
+// 칸반 이동 API
 app.post("/api/memos/status", async (req, res) => {
   if (!req.session.user || req.session.user.role === "Viewer")
     return res.status(403).json({ message: "권한이 없습니다." });
@@ -216,7 +216,7 @@ app.post("/api/memos/status", async (req, res) => {
   res.json({ success: true, memo: data[0] });
 });
 
-// 댓글, 히스토리, 활동로그 API
+// 댓글, 히스토리, 활동로그
 app.get("/api/comments/:memoId", async (req, res) => {
   const { data, error } = await supabase
     .from("comments")
@@ -237,7 +237,6 @@ app.get("/api/history/:memoId", async (req, res) => {
   res.json(data);
 });
 
-// 활동 로그 조회 API
 app.get("/api/logs", async (req, res) => {
   const { data, error } = await supabase
     .from("audit_logs")
@@ -260,16 +259,6 @@ app.get("/api/admin/logs", async (req, res) => {
   res.json(data);
 });
 
-// 캔버스 연동 API
-app.get("/api/connections/:boardId", async (req, res) => {
-  const { data, error } = await supabase
-    .from("memo_connections")
-    .select("*")
-    .eq("board_id", req.params.boardId);
-  if (error) return res.status(500).json({ error: error.message });
-  res.json(data);
-});
-
 app.get("/api/drawings/:boardId", async (req, res) => {
   const { data, error } = await supabase
     .from("canvas_drawings")
@@ -279,7 +268,7 @@ app.get("/api/drawings/:boardId", async (req, res) => {
   res.json(data);
 });
 
-// --- Socket.io 실시간 통신 ---
+// Socket.io 통신
 const activeUsers = new Map();
 
 io.on("connection", (socket) => {
@@ -381,17 +370,6 @@ io.on("connection", (socket) => {
       .select();
     if (comment) {
       io.to(boardId).emit("comment:added", { memoId, comment: comment[0] });
-      const mentions = content.match(/@([^\s]+)/g);
-      if (mentions) {
-        mentions.forEach((m) => {
-          io.emit("notification:mention", {
-            targetName: m.replace("@", ""),
-            from: user?.name,
-            content,
-            memoId,
-          });
-        });
-      }
     }
   });
 
@@ -437,5 +415,5 @@ io.on("connection", (socket) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`🎬 피그마/칸반 협업 스튜디오 실행 중: http://localhost:${PORT}`);
+  console.log(`🎬 릴스 협업 노트패드 실행 중: http://localhost:${PORT}`);
 });

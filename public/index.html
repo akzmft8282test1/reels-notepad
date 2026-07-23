@@ -13,7 +13,7 @@
     />
     <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
 
-    <!-- Fabric.js 초고속 캔버스 패키지 -->
+    <!-- Fabric.js 패키지 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
     <style>
@@ -27,7 +27,6 @@
         --grid-color: #cbd5e1;
       }
 
-      /* 다크 모드 연동 */
       body.dark-mode {
         --bg: #121212;
         --card-bg: #1e1e1e;
@@ -101,6 +100,12 @@
         padding: 14px;
         margin-bottom: 15px;
         position: relative;
+        outline: none;
+      }
+      .card.selected,
+      .canvas-card.selected {
+        border: 2px solid var(--primary);
+        box-shadow: 0 0 10px rgba(225, 48, 108, 0.4);
       }
       .card.pinned {
         border: 2px solid var(--primary);
@@ -123,12 +128,6 @@
         font-size: 0.85rem;
         margin-top: 8px;
         white-space: pre-wrap;
-      }
-      .char-warning {
-        color: #d9534f;
-        font-size: 0.75rem;
-        font-weight: bold;
-        display: none;
       }
 
       /* 무한 캔버스 전용 뷰포트 */
@@ -153,15 +152,6 @@
         left: 0;
         transform-origin: 0 0;
       }
-      #connectionsSvg {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 2;
-      }
       .canvas-container {
         position: absolute !important;
         top: 0;
@@ -180,46 +170,10 @@
         z-index: 10;
         resize: both;
         overflow: auto;
+        outline: none;
       }
 
-      /* 영상 미리보기 호버 팝업 */
-      .video-preview-wrapper {
-        position: relative;
-        display: inline-block;
-        margin-top: 6px;
-      }
-      .video-preview-btn {
-        font-size: 0.75rem;
-        background: #3897f0;
-        color: white;
-        padding: 3px 6px;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      .video-preview-popup {
-        display: none;
-        position: absolute;
-        bottom: 125%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 260px;
-        height: 180px;
-        background: #000;
-        border-radius: 8px;
-        z-index: 1000;
-        overflow: hidden;
-        border: 2px solid var(--primary);
-      }
-      .video-preview-wrapper:hover .video-preview-popup {
-        display: block;
-      }
-      .video-preview-popup iframe {
-        width: 100%;
-        height: 100%;
-        border: none;
-      }
-
-      /* 피그마식 우클릭 컨텍스트 메뉴 */
+      /* 커스텀 우클릭 컨텍스트 메뉴 */
       #contextMenu {
         display: none;
         position: fixed;
@@ -227,22 +181,24 @@
         color: var(--text);
         border: 1px solid var(--border);
         border-radius: 8px;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        z-index: 4000;
-        min-width: 140px;
-        padding: 4px 0;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+        z-index: 9999;
+        min-width: 150px;
+        padding: 6px 0;
       }
       #contextMenu div {
-        padding: 8px 12px;
+        padding: 8px 14px;
         font-size: 0.85rem;
         cursor: pointer;
+        display: flex;
+        justify-content: space-between;
       }
       #contextMenu div:hover {
         background: var(--primary);
         color: #fff;
       }
 
-      /* 댓글 `@` 멘션 자동완성 드롭다운 */
+      /* 댓글 `@` 멘션 드롭다운 */
       #mentionDropdown {
         display: none;
         position: absolute;
@@ -267,7 +223,14 @@
         font-weight: bold;
       }
 
-      /* 모달 및 UI */
+      /* 툴바 커스텀 스타일 */
+      .tool-btn.active {
+        background: var(--primary) !important;
+        color: white !important;
+        font-weight: bold;
+      }
+
+      /* 모달 UI */
       .modal-bg {
         display: none;
         position: fixed;
@@ -302,17 +265,6 @@
         flex-direction: column;
         justify-content: space-between;
         margin: 0 auto;
-      }
-      .user-cursor {
-        position: absolute;
-        pointer-events: none;
-        font-size: 11px;
-        padding: 2px 6px;
-        background: var(--primary);
-        color: #fff;
-        border-radius: 8px;
-        z-index: 9999;
-        white-space: nowrap;
       }
 
       .sidebar {
@@ -455,7 +407,7 @@
       <button onclick="login()">로그인</button>
     </div>
 
-    <!-- 구역 1: 원본 칸반 보드 뷰 -->
+    <!-- 1. 칸반 보드 뷰 -->
     <div
       id="kanbanView"
       class="container"
@@ -519,8 +471,9 @@
       </div>
     </div>
 
-    <!-- 구역 2: 무한 캔버스 뷰 -->
+    <!-- 2. 무한 캔버스 뷰 -->
     <div id="canvasView">
+      <!-- 캔버스 모드 조작 툴바 -->
       <div
         style="
           position: absolute;
@@ -529,7 +482,7 @@
           z-index: 100;
           display: flex;
           gap: 6px;
-          background: rgba(255, 255, 255, 0.9);
+          background: rgba(255, 255, 255, 0.95);
           padding: 6px;
           border-radius: 8px;
           border: 1px solid #ccc;
@@ -537,16 +490,33 @@
         "
       >
         <button
-          style="width: auto; padding: 4px 8px"
+          id="btnPan"
+          class="tool-btn active"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('pan')"
+        >
+          🖐️ 캔버스 이동
+        </button>
+        <button
+          id="btnSelect"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
           onclick="setTool('select')"
         >
-          🖐️ 선택/이동
+          ↖️ 선택/편집
         </button>
-        <button style="width: auto; padding: 4px 8px" onclick="setTool('pen')">
+        <button
+          id="btnPen"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
+          onclick="setTool('pen')"
+        >
           ✏️ 펜
         </button>
         <button
-          style="width: auto; padding: 4px 8px"
+          id="btnEraser"
+          class="tool-btn"
+          style="width: auto; padding: 4px 10px"
           onclick="setTool('eraser')"
         >
           🧹 지우개
@@ -555,7 +525,7 @@
           type="color"
           id="penColor"
           value="#e1306c"
-          style="width: 28px; height: 24px; border: none"
+          style="width: 28px; height: 24px; border: none; cursor: pointer"
           onchange="updatePenColor()"
         />
         <button
@@ -566,17 +536,24 @@
         </button>
       </div>
       <div id="canvasContainer">
-        <svg id="connectionsSvg"></svg>
         <canvas id="fabricCanvas" width="6000" height="6000"></canvas>
       </div>
     </div>
 
-    <!-- 우클릭 커스텀 컨텍스트 메뉴 (잘라내기/복사/붙여넣기/삭제) -->
+    <!-- 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
-      <div onclick="contextAction('cut')">✂️ 잘라내기</div>
-      <div onclick="contextAction('copy')">📋 대본 복사</div>
-      <div onclick="contextAction('paste')">📥 대본 붙여넣기</div>
-      <div onclick="contextAction('delete')">🗑️ 메모 삭제</div>
+      <div onclick="contextAction('cut')">
+        <span>✂️ 잘라내기</span><small style="opacity: 0.6">Ctrl+X</small>
+      </div>
+      <div onclick="contextAction('copy')">
+        <span>📋 대본 복사</span><small style="opacity: 0.6">Ctrl+C</small>
+      </div>
+      <div onclick="contextAction('paste')">
+        <span>📥 대본 붙여넣기</span><small style="opacity: 0.6">Ctrl+V</small>
+      </div>
+      <div onclick="contextAction('delete')" style="color: #e74c3c">
+        <span>🗑️ 삭제하기</span><small style="opacity: 0.6">Del</small>
+      </div>
     </div>
 
     <!-- 메모 작성/수정 모달 -->
@@ -622,7 +599,7 @@
       </div>
     </div>
 
-    <!-- 댓글 모달 (@멘션 자동완성) -->
+    <!-- 댓글 모달 -->
     <div id="commentModal" class="modal-bg">
       <div class="modal" style="position: relative">
         <h3>💬 아이디어 토론 댓글</h3>
@@ -791,13 +768,19 @@
       let currentUser = null;
       let currentBoardId = null;
       let selectedMemoForComment = null;
-      let selectedContextMenuMemoId = null;
+      let activeSelectedMemoId = null;
       let clipboardData = null;
       let fCanvas = null;
       let quill = null;
       let activeView = "kanban";
+      let currentTool = "pan"; // 기본 툴: pan (캔버스 이동)
       let memosCache = {};
       let teamMembers = [];
+
+      // 무한 캔버스 Pan 좌표 관련
+      let isPanning = false;
+      let panStart = { x: 0, y: 0 };
+      let canvasPos = { x: 0, y: 0 };
 
       function getEmbedUrl(url) {
         if (!url) return null;
@@ -837,24 +820,90 @@
           });
         });
 
-        // 우클릭 컨텍스트 메뉴 감지
-        document.addEventListener("contextmenu", (e) => {
-          const cardEl = e.target.closest(".card, .canvas-card");
-          if (cardEl) {
-            e.preventDefault();
-            selectedContextMenuMemoId =
-              cardEl.dataset.id || cardEl.id.replace("card-", "");
-            const menu = document.getElementById("contextMenu");
-            menu.style.left = `${e.clientX}px`;
-            menu.style.top = `${e.clientY}px`;
-            menu.style.display = "block";
-          } else {
-            document.getElementById("contextMenu").style.display = "none";
+        // 무한 캔버스 이동(Pan) 이벤트 핸들러
+        const canvasView = document.getElementById("canvasView");
+        const container = document.getElementById("canvasContainer");
+
+        canvasView.addEventListener("mousedown", (e) => {
+          if (
+            currentTool === "pan" &&
+            e.target.closest("#canvasView") &&
+            !e.target.closest(".canvas-card")
+          ) {
+            isPanning = true;
+            panStart = {
+              x: e.clientX - canvasPos.x,
+              y: e.clientY - canvasPos.y,
+            };
+            canvasView.style.cursor = "grabbing";
           }
         });
 
-        document.addEventListener("click", () => {
+        window.addEventListener("mousemove", (e) => {
+          if (isPanning) {
+            canvasPos.x = e.clientX - panStart.x;
+            canvasPos.y = e.clientY - panStart.y;
+            container.style.transform = `translate(${canvasPos.x}px, ${canvasPos.y}px)`;
+          }
+        });
+
+        window.addEventListener("mouseup", () => {
+          if (isPanning) {
+            isPanning = false;
+            if (currentTool === "pan") canvasView.style.cursor = "grab";
+          }
+        });
+
+        // 우클릭 컨텍스트 메뉴 이벤트
+        window.addEventListener("contextmenu", (e) => {
+          const cardEl = e.target.closest(".card, .canvas-card");
+          const contextMenu = document.getElementById("contextMenu");
+
+          if (cardEl) {
+            e.preventDefault();
+            activeSelectedMemoId =
+              cardEl.dataset.id || cardEl.id.replace("card-", "");
+            highlightSelectedCard(activeSelectedMemoId);
+
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.display = "block";
+          } else if (fCanvas.getActiveObject()) {
+            e.preventDefault();
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.display = "block";
+          } else {
+            contextMenu.style.display = "none";
+          }
+        });
+
+        window.addEventListener("click", () => {
           document.getElementById("contextMenu").style.display = "none";
+        });
+
+        // 키보드 Delete 키 삭제
+        window.addEventListener("keydown", (e) => {
+          const activeTag = document.activeElement
+            ? document.activeElement.tagName.toLowerCase()
+            : "";
+          const isEditingText =
+            activeTag === "input" ||
+            activeTag === "textarea" ||
+            document.activeElement.classList.contains("ql-editor");
+
+          if (isEditingText) return;
+
+          if (e.key === "Delete" || e.key === "Backspace") {
+            if (activeSelectedMemoId) {
+              e.preventDefault();
+              deleteMemo(activeSelectedMemoId);
+              activeSelectedMemoId = null;
+            } else if (fCanvas && fCanvas.getActiveObject()) {
+              e.preventDefault();
+              fCanvas.remove(fCanvas.getActiveObject());
+            }
+          }
         });
 
         init();
@@ -872,45 +921,66 @@
         }
       }
 
-      // 닿은 선 부분만 지워지는 스마트 지우개 브러시 적용
+      // 모드 선택 분리 (Pan / Select / Pen / Eraser)
       function setTool(tool) {
-        if (tool === "pen") {
+        currentTool = tool;
+        document
+          .querySelectorAll(".tool-btn")
+          .forEach((btn) => btn.classList.remove("active"));
+        const canvasView = document.getElementById("canvasView");
+
+        if (tool === "pan") {
+          document.getElementById("btnPan").classList.add("active");
+          fCanvas.isDrawingMode = false;
+          fCanvas.selection = false;
+          canvasView.style.cursor = "grab";
+        } else if (tool === "select") {
+          document.getElementById("btnSelect").classList.add("active");
+          fCanvas.isDrawingMode = false;
+          fCanvas.selection = true;
+          canvasView.style.cursor = "default";
+        } else if (tool === "pen") {
+          document.getElementById("btnPen").classList.add("active");
           fCanvas.isDrawingMode = true;
           fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
           fCanvas.freeDrawingBrush.width = 3;
           fCanvas.freeDrawingBrush.color =
             document.getElementById("penColor").value;
+          canvasView.style.cursor = "crosshair";
         } else if (tool === "eraser") {
+          document.getElementById("btnEraser").classList.add("active");
           fCanvas.isDrawingMode = true;
-          if (fabric.EraserBrush) {
-            fCanvas.freeDrawingBrush = new fabric.EraserBrush(fCanvas);
-            fCanvas.freeDrawingBrush.width = 15;
-          } else {
-            // 하위 호환
-            fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
-            fCanvas.freeDrawingBrush.width = 15;
-            fCanvas.freeDrawingBrush.color = document.body.classList.contains(
-              "dark-mode",
-            )
-              ? "#18181b"
-              : "#f8fafc";
-          }
-        } else {
-          fCanvas.isDrawingMode = false;
+          fCanvas.freeDrawingBrush = new fabric.PencilBrush(fCanvas);
+          fCanvas.freeDrawingBrush.width = 20;
+          fCanvas.freeDrawingBrush.strokeLineCap = "round";
+          fCanvas.freeDrawingBrush.strokeLineJoin = "round";
+          fCanvas.freeDrawingBrush.color = "rgba(0,0,0,1)";
+          fCanvas.contextTop.globalCompositeOperation = "destination-out";
+          canvasView.style.cursor = "cell";
         }
       }
 
-      // 우클릭 메뉴 동작 (잘라내기, 복사, 붙여넣기, 삭제)
+      function highlightSelectedCard(memoId) {
+        document
+          .querySelectorAll(".card, .canvas-card")
+          .forEach((el) => el.classList.remove("selected"));
+        const target = document.querySelector(
+          `.card[data-id="${memoId}"], #card-${memoId}`,
+        );
+        if (target) target.classList.add("selected");
+      }
+
       function contextAction(type) {
-        if (type === "copy") {
-          clipboardData = memosCache[selectedContextMenuMemoId];
-          alert("대본이 클립보드에 복사되었습니다.");
-        } else if (type === "cut") {
-          clipboardData = memosCache[selectedContextMenuMemoId];
-          deleteMemo(selectedContextMenuMemoId);
+        if (type === "copy" && activeSelectedMemoId) {
+          clipboardData = memosCache[activeSelectedMemoId];
+          alert("대본이 복사되었습니다.");
+        } else if (type === "cut" && activeSelectedMemoId) {
+          clipboardData = memosCache[activeSelectedMemoId];
+          deleteMemo(activeSelectedMemoId);
+          activeSelectedMemoId = null;
           alert("대본이 잘라내기 되었습니다.");
         } else if (type === "paste") {
-          if (!clipboardData) return alert("복사된 대본 데이터가 없습니다.");
+          if (!clipboardData) return alert("복사된 대본이 없습니다.");
           socket.emit("memo:save", {
             board_id: currentBoardId,
             title: `${clipboardData.title} (복사본)`,
@@ -921,7 +991,12 @@
             author: currentUser.name,
           });
         } else if (type === "delete") {
-          deleteMemo(selectedContextMenuMemoId);
+          if (activeSelectedMemoId) {
+            deleteMemo(activeSelectedMemoId);
+            activeSelectedMemoId = null;
+          } else if (fCanvas.getActiveObject()) {
+            fCanvas.remove(fCanvas.getActiveObject());
+          }
         }
       }
 
@@ -938,10 +1013,10 @@
 
         if (res.ok) {
           nameInput.value = "";
-          alert("새 게시판이 성공적으로 생성되었습니다!");
+          alert("새 게시판이 추가되었습니다!");
           loadBoards();
         } else {
-          alert("게시판 생성 중 오류가 발생했습니다.");
+          alert("게시판 생성 실패");
         }
       }
 
@@ -1000,6 +1075,7 @@
         } else {
           document.getElementById("kanbanView").style.display = "none";
           document.getElementById("canvasView").style.display = "block";
+          setTool("pan");
         }
         if (currentBoardId) loadMemos();
       }
@@ -1011,7 +1087,7 @@
       }
 
       function clearDrawings() {
-        if (confirm("캔버스 손그림을 지우시겠습니까?"))
+        if (confirm("캔버스의 모든 드로잉을 지우시겠습니까?"))
           socket.emit("drawing:clear", currentBoardId);
       }
 
@@ -1091,9 +1167,14 @@
           const card = document.createElement("div");
           card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
           card.dataset.id = memo.id;
+          card.tabIndex = 0;
           card.draggable = currentUser.role !== "Viewer";
           card.ondragstart = (e) =>
             e.dataTransfer.setData("text/plain", memo.id);
+          card.onclick = () => {
+            activeSelectedMemoId = memo.id;
+            highlightSelectedCard(memo.id);
+          };
 
           card.innerHTML = `
             ${memo.is_pinned ? '📌 <b style="color:var(--primary); font-size:0.75rem;">고정됨</b><br>' : ""}
@@ -1144,6 +1225,7 @@
           card.className = "canvas-card";
           card.dataset.id = memo.id;
           card.id = `card-${memo.id}`;
+          card.tabIndex = 0;
           card.style.left = `${memo.pos_x || 100 + (index % 4) * 320}px`;
           card.style.top = `${memo.pos_y || 100 + Math.floor(index / 4) * 260}px`;
 
@@ -1157,18 +1239,24 @@
             <button style="font-size:0.65rem; margin-top:6px; background:#27ae60;" onclick="editMemo('${memo.id}')">✏️ 편집</button>
           `;
 
-          let isDragging = false,
+          card.onclick = () => {
+            activeSelectedMemoId = memo.id;
+            highlightSelectedCard(memo.id);
+          };
+
+          let isDraggingCard = false,
             offsetLeft = 0,
             offsetTop = 0;
           card.addEventListener("mousedown", (e) => {
-            if (e.target.tagName === "BUTTON" || fCanvas.isDrawingMode) return;
-            isDragging = true;
+            if (currentTool !== "select" || e.target.tagName === "BUTTON")
+              return;
+            isDraggingCard = true;
             offsetLeft = e.clientX - card.offsetLeft;
             offsetTop = e.clientY - card.offsetTop;
           });
 
           window.addEventListener("mousemove", (e) => {
-            if (isDragging) {
+            if (isDraggingCard && currentTool === "select") {
               const newX = e.clientX - offsetLeft;
               const newY = e.clientY - offsetTop;
               card.style.left = `${newX}px`;
@@ -1183,7 +1271,7 @@
           });
 
           window.addEventListener("mouseup", () => {
-            isDragging = false;
+            isDraggingCard = false;
           });
           container.appendChild(card);
         });
