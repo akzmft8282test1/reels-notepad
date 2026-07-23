@@ -42,21 +42,7 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// 도형 조회 API (shapes.forEach 에러 예방용 Safelist 처리)
-app.get("/api/shapes/:boardId", async (req, res) => {
-  try {
-    const { data, error } = await supabase
-      .from("shapes")
-      .select("*")
-      .eq("board_id", req.params.boardId);
-    if (error) return res.status(200).json([]); // 예외 시 빈 배열 리턴으로 클라이언트 에러 방지
-    res.json(data || []);
-  } catch (e) {
-    res.json([]);
-  }
-});
-
-// 로그인 API
+// === 로그인 API ===
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   const { data: user, error } = await supabase
@@ -65,20 +51,22 @@ app.post("/api/login", async (req, res) => {
     .eq("username", username)
     .single();
 
-  if (error || !user)
+  if (error || !user) {
     return res
       .status(401)
       .json({ success: false, message: "등록되지 않은 계정입니다." });
+  }
 
   let isValidPassword =
     user.password && user.password.startsWith("$2")
       ? await bcrypt.compare(password, user.password)
       : password === user.password;
 
-  if (!isValidPassword)
+  if (!isValidPassword) {
     return res
       .status(401)
       .json({ success: false, message: "비밀번호가 올바르지 않습니다." });
+  }
 
   req.session.user = {
     id: user.id,
@@ -110,7 +98,7 @@ app.get("/api/users", async (req, res) => {
   res.json(data || []);
 });
 
-// 게시판 목록 조회
+// === 게시판 REST API ===
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -120,10 +108,10 @@ app.get("/api/boards", async (req, res) => {
   res.json(data || []);
 });
 
-// 게시판 생성 API
 app.post("/api/boards", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
+  if (!req.session.user || req.session.user.role === "Viewer") {
     return res.status(403).json({ message: "권한이 없습니다." });
+  }
   const { name, description } = req.body;
   const { data, error } = await supabase
     .from("boards")
@@ -138,7 +126,6 @@ app.post("/api/boards", async (req, res) => {
   res.json(data[0]);
 });
 
-// 게시판 삭제 API
 app.delete("/api/boards/:id", async (req, res) => {
   if (
     !req.session.user ||
@@ -152,6 +139,7 @@ app.delete("/api/boards/:id", async (req, res) => {
   try {
     await supabase.from("memos").delete().eq("board_id", boardId);
     await supabase.from("canvas_drawings").delete().eq("board_id", boardId);
+    await supabase.from("shapes").delete().eq("board_id", boardId);
     const { error } = await supabase.from("boards").delete().eq("id", boardId);
     if (error) throw error;
 
@@ -167,7 +155,6 @@ app.delete("/api/boards/:id", async (req, res) => {
   }
 });
 
-// 캔버스 크기 저장 API
 app.post("/api/boards/size", async (req, res) => {
   const { boardId, width, height } = req.body;
   try {
@@ -182,6 +169,54 @@ app.post("/api/boards/size", async (req, res) => {
   }
 });
 
+// === 도형(Shapes) CRUD API ===
+app.get("/api/shapes/:boardId", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("shapes")
+      .select("*")
+      .eq("board_id", req.params.boardId);
+    if (error) return res.json([]);
+    res.json(data || []);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+app.post("/api/shapes", async (req, res) => {
+  try {
+    const shapeData = req.body;
+    const { data, error } = await supabase
+      .from("shapes")
+      .upsert([shapeData])
+      .select();
+    if (error) return res.status(500).json({ error: error.message });
+    io.to(shapeData.board_id).emit("shape:updated", data[0]);
+    res.json(data[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/shapes/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data } = await supabase
+      .from("shapes")
+      .select("board_id")
+      .eq("id", id)
+      .single();
+    await supabase.from("shapes").delete().eq("id", id);
+    if (data) {
+      io.to(data.board_id).emit("shape:deleted", id);
+    }
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// === 메모/대본 CRUD API ===
 app.get("/api/memos/:boardId", async (req, res) => {
   const { boardId } = req.params;
   const { data, error } = await supabase
@@ -212,8 +247,9 @@ app.get("/api/trash/:boardId", async (req, res) => {
 });
 
 app.post("/api/memos/restore", async (req, res) => {
-  if (!req.session.user || req.session.user.role === "Viewer")
+  if (!req.session.user || req.session.user.role === "Viewer") {
     return res.status(403).json({ message: "권한이 없습니다." });
+  }
   const { memoId } = req.body;
   const { data, error } = await supabase
     .from("memos")
@@ -255,7 +291,7 @@ app.get("/api/logs", async (req, res) => {
   res.json(data || []);
 });
 
-// Socket.io 통신
+// === Realtime Socket.io 관리 ===
 const activeUsers = new Map();
 
 io.on("connection", (socket) => {
@@ -264,11 +300,13 @@ io.on("connection", (socket) => {
 
   if (user) {
     activeUsers.set(socket.id, {
-      id: socket.id,
+      socketId: socket.id,
       username: user.username,
       name: user.name,
       role: user.role,
       boardId: null,
+      x: 0,
+      y: 0,
     });
     io.emit("presence:update", Array.from(activeUsers.values()));
   }
@@ -277,7 +315,24 @@ io.on("connection", (socket) => {
     socket.join(boardId);
     if (activeUsers.has(socket.id)) {
       activeUsers.get(socket.id).boardId = boardId;
-      io.emit("presence:update", Array.from(activeUsers.values()));
+      const currentBoardUsers = Array.from(activeUsers.values()).filter(
+        (u) => u.boardId === boardId,
+      );
+      io.to(boardId).emit("presence:update", currentBoardUsers);
+    }
+  });
+
+  socket.on("cursor:move", ({ boardId, x, y }) => {
+    if (activeUsers.has(socket.id)) {
+      const u = activeUsers.get(socket.id);
+      u.x = x;
+      u.y = y;
+      socket.to(boardId).emit("cursor:moved", {
+        socketId: socket.id,
+        name: u.name,
+        x,
+        y,
+      });
     }
   });
 
@@ -360,8 +415,15 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
+    const u = activeUsers.get(socket.id);
     activeUsers.delete(socket.id);
-    io.emit("presence:update", Array.from(activeUsers.values()));
+    if (u && u.boardId) {
+      const currentBoardUsers = Array.from(activeUsers.values()).filter(
+        (usr) => usr.boardId === u.boardId,
+      );
+      io.to(u.boardId).emit("presence:update", currentBoardUsers);
+      io.to(u.boardId).emit("cursor:left", socket.id);
+    }
   });
 });
 
