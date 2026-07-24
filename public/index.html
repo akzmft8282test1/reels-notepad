@@ -533,19 +533,22 @@
       </button>
     </div>
 
-    <!-- 로그인 -->
+    <!-- 로그인 (Form 감싸기 적용) -->
     <div
       id="loginView"
       style="max-width: 360px; margin: 80px auto; text-align: center">
       <h2>🔐 로그인</h2>
-      <input type="text" id="username" placeholder="아이디" />
-      <input type="password" id="password" placeholder="비밀번호" />
-      <button
-        class="btn btn-primary"
-        style="margin-top: 12px"
-        onclick="login()">
-        로그인
-      </button>
+      <form
+        onsubmit="
+          event.preventDefault();
+          login();
+        ">
+        <input type="text" id="username" placeholder="아이디" />
+        <input type="password" id="password" placeholder="비밀번호" />
+        <button type="submit" class="btn btn-primary" style="margin-top: 12px">
+          로그인
+        </button>
+      </form>
     </div>
 
     <!-- 1. 칸반 보드 -->
@@ -899,6 +902,7 @@
       let isDrawing = false,
         lastX = 0,
         lastY = 0;
+      let lastEmitTime = 0; // 소켓 최적화용 타임스탬프
       let isPanning = false,
         panStart = { x: 0, y: 0 },
         canvasPos = { x: 0, y: 0 },
@@ -1097,7 +1101,6 @@
         if (!currentBoardId) return alert("게시판을 선택하세요.");
 
         const shapeData = shapeDataParam || {
-          id: "shape-" + Date.now(),
           board_id: currentBoardId,
           type: type,
           pos_x: Math.round(300 - canvasPos.x),
@@ -1107,17 +1110,24 @@
           color: document.getElementById("penColor").value || "#e1306c",
         };
 
-        const res = await fetch("/api/shapes", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(shapeData),
-        });
-        if (res.ok) {
-          const created = await res.json();
-          renderSingleShape(created);
-          if (!isUndoAction) {
-            pushHistory({ type: "ADD", itemType: "shape", data: created });
+        try {
+          const res = await fetch("/api/shapes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(shapeData),
+          });
+          if (res.ok) {
+            const created = await res.json();
+            renderSingleShape(created);
+            if (!isUndoAction) {
+              pushHistory({ type: "ADD", itemType: "shape", data: created });
+            }
+          } else {
+            const errData = await res.json();
+            alert("도형 생성 실패: " + (errData.error || "서버 오류"));
           }
+        } catch (err) {
+          console.error("addShape Error:", err);
         }
       };
 
@@ -1263,13 +1273,13 @@
         let deletedItemData = null;
         let deletedItemType = null;
 
-        if (id.startsWith("shape-")) {
+        if (String(id).startsWith("shape-") || shapesCache[id]) {
           deletedItemType = "shape";
           deletedItemData = shapesCache[id];
           await fetch(`/api/shapes/${id}`, { method: "DELETE" });
           if (el) el.remove();
           delete shapesCache[id];
-        } else if (id.startsWith("sticky-")) {
+        } else if (String(id).startsWith("sticky-")) {
           deletedItemType = "sticky";
           deletedItemData = stickyCache[id];
           if (el) el.remove();
@@ -1289,7 +1299,9 @@
         }
 
         connectorsList = connectorsList.filter(
-          (c) => c.start_id !== id && c.end_id !== id,
+          (c) =>
+            String(c.start_id) !== String(id) &&
+            String(c.end_id) !== String(id),
         );
         updateConnectors();
       }
@@ -1436,14 +1448,11 @@
                 connectorStartElem.id || connectorStartElem.dataset.id;
               const endId = el.id || el.dataset.id;
               const connObj = {
-                id: "conn-" + Date.now(),
                 board_id: currentBoardId,
                 start_id: startId,
                 end_id: endId,
               };
-              connectorsList.push(connObj);
               saveConnector(connObj);
-              updateConnectors();
             }
             connectorStartElem.style.outline = "";
             connectorStartElem = null;
@@ -1471,12 +1480,23 @@
         highlightSelectedElements();
       }
 
-      function saveConnector(conn) {
-        fetch("/api/connectors", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(conn),
-        });
+      async function saveConnector(conn) {
+        try {
+          const res = await fetch("/api/connectors", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(conn),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (!connectorsList.find((c) => c.id === data.id)) {
+              connectorsList.push(data);
+              updateConnectors();
+            }
+          }
+        } catch (e) {
+          console.error("Connector Save Error:", e);
+        }
       }
 
       function highlightSelectedElements() {
@@ -1507,8 +1527,10 @@
 
         applyCanvasSize(canvasWidth, canvasHeight);
 
+        // --- 펜/지우개 드로잉 렉 최적화 ---
         const startDraw = (e) => {
           if (currentTool !== "pen" && currentTool !== "eraser") return;
+          if (e.touches) e.preventDefault();
           isDrawing = true;
           const pos = getPointerPos(e);
           lastX = pos.x;
@@ -1517,7 +1539,9 @@
 
         const moveDraw = (e) => {
           if (!isDrawing) return;
+          if (e.touches) e.preventDefault();
           const pos = getPointerPos(e);
+
           ctx.beginPath();
           ctx.moveTo(lastX, lastY);
           ctx.lineTo(pos.x, pos.y);
@@ -1533,17 +1557,23 @@
           ctx.lineCap = "round";
           ctx.stroke();
 
-          socket.emit("drawing:stroke", {
-            boardId: currentBoardId,
-            strokeData: {
-              tool: currentTool,
-              x1: lastX,
-              y1: lastY,
-              x2: pos.x,
-              y2: pos.y,
-              color: document.getElementById("penColor").value,
-            },
-          });
+          // Socket 전송 프레임 조절 (Throttling ~16ms)
+          const now = Date.now();
+          if (now - lastEmitTime > 16) {
+            socket.emit("drawing:stroke", {
+              boardId: currentBoardId,
+              strokeData: {
+                tool: currentTool,
+                x1: lastX,
+                y1: lastY,
+                x2: pos.x,
+                y2: pos.y,
+                color: document.getElementById("penColor").value,
+              },
+            });
+            lastEmitTime = now;
+          }
+
           lastX = pos.x;
           lastY = pos.y;
         };

@@ -170,7 +170,7 @@ app.post("/api/boards/size", async (req, res) => {
   }
 });
 
-// === 도형(Shapes) API ===
+// === 도형(Shapes) API (500 에러 해결 적용) ===
 app.get("/api/shapes/:boardId", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -186,15 +186,30 @@ app.get("/api/shapes/:boardId", async (req, res) => {
 
 app.post("/api/shapes", async (req, res) => {
   try {
-    const shapeData = req.body;
+    const shapeData = { ...req.body };
+    // 커스텀 임시 ID인 경우 DB 자동 생성 및 타입 충돌 방지를 위해 id 삭제
+    if (shapeData.id && String(shapeData.id).startsWith("shape-")) {
+      delete shapeData.id;
+    }
+
     const { data, error } = await supabase
       .from("shapes")
       .upsert([shapeData])
       .select();
-    if (error) return res.status(500).json({ error: error.message });
-    io.to(shapeData.board_id).emit("shape:updated", data[0]);
-    res.json(data[0]);
+
+    if (error) {
+      console.error("Shape Insert Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (data && data[0]) {
+      io.to(shapeData.board_id).emit("shape:updated", data[0]);
+      res.json(data[0]);
+    } else {
+      res.status(500).json({ error: "도형 생성 실패" });
+    }
   } catch (e) {
+    console.error("Shape Catch Error:", e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -215,7 +230,7 @@ app.delete("/api/shapes/:id", async (req, res) => {
   }
 });
 
-// === 연결선(Connectors) API ===
+// === 연결선(Connectors) API (500 에러 해결 적용) ===
 app.get("/api/connectors/:boardId", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -231,15 +246,30 @@ app.get("/api/connectors/:boardId", async (req, res) => {
 
 app.post("/api/connectors", async (req, res) => {
   try {
-    const connData = req.body;
+    const connData = { ...req.body };
+    // 커스텀 임시 ID인 경우 DB 타입 충돌 방지를 위해 id 삭제
+    if (connData.id && String(connData.id).startsWith("conn-")) {
+      delete connData.id;
+    }
+
     const { data, error } = await supabase
       .from("connectors")
       .upsert([connData])
       .select();
-    if (error) return res.status(500).json({ error: error.message });
-    io.to(connData.board_id).emit("connector:updated", data[0]);
-    res.json(data[0]);
+
+    if (error) {
+      console.error("Connector Insert Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (data && data[0]) {
+      io.to(connData.board_id).emit("connector:updated", data[0]);
+      res.json(data[0]);
+    } else {
+      res.status(500).json({ error: "연결선 생성 실패" });
+    }
   } catch (e) {
+    console.error("Connector Catch Error:", e);
     res.status(500).json({ error: e.message });
   }
 });
