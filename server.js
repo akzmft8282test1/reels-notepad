@@ -98,7 +98,7 @@ app.get("/api/users", async (req, res) => {
   res.json(data || []);
 });
 
-// === 게시판 REST API ===
+// === 게시판 API ===
 app.get("/api/boards", async (req, res) => {
   const { data, error } = await supabase
     .from("boards")
@@ -140,6 +140,7 @@ app.delete("/api/boards/:id", async (req, res) => {
     await supabase.from("memos").delete().eq("board_id", boardId);
     await supabase.from("canvas_drawings").delete().eq("board_id", boardId);
     await supabase.from("shapes").delete().eq("board_id", boardId);
+    await supabase.from("connectors").delete().eq("board_id", boardId);
     const { error } = await supabase.from("boards").delete().eq("id", boardId);
     if (error) throw error;
 
@@ -169,7 +170,7 @@ app.post("/api/boards/size", async (req, res) => {
   }
 });
 
-// === 도형(Shapes) CRUD API ===
+// === 도형(Shapes) API ===
 app.get("/api/shapes/:boardId", async (req, res) => {
   try {
     const { data, error } = await supabase
@@ -207,9 +208,52 @@ app.delete("/api/shapes/:id", async (req, res) => {
       .eq("id", id)
       .single();
     await supabase.from("shapes").delete().eq("id", id);
-    if (data) {
-      io.to(data.board_id).emit("shape:deleted", id);
-    }
+    if (data) io.to(data.board_id).emit("shape:deleted", id);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// === 연결선(Connectors) API ===
+app.get("/api/connectors/:boardId", async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from("connectors")
+      .select("*")
+      .eq("board_id", req.params.boardId);
+    if (error) return res.json([]);
+    res.json(data || []);
+  } catch (e) {
+    res.json([]);
+  }
+});
+
+app.post("/api/connectors", async (req, res) => {
+  try {
+    const connData = req.body;
+    const { data, error } = await supabase
+      .from("connectors")
+      .upsert([connData])
+      .select();
+    if (error) return res.status(500).json({ error: error.message });
+    io.to(connData.board_id).emit("connector:updated", data[0]);
+    res.json(data[0]);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/connectors/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data } = await supabase
+      .from("connectors")
+      .select("board_id")
+      .eq("id", id)
+      .single();
+    await supabase.from("connectors").delete().eq("id", id);
+    if (data) io.to(data.board_id).emit("connector:deleted", id);
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -291,7 +335,7 @@ app.get("/api/logs", async (req, res) => {
   res.json(data || []);
 });
 
-// === Realtime Socket.io 관리 ===
+// === Socket.io Realtime ===
 const activeUsers = new Map();
 
 io.on("connection", (socket) => {
@@ -398,11 +442,17 @@ io.on("connection", (socket) => {
       io.to(boardId).emit("comment:added", { memoId, comment: comment[0] });
   });
 
-  socket.on("memo:move", async ({ memoId, boardId, pos_x, pos_y }) => {
-    if (user?.role === "Viewer") return;
-    await supabase.from("memos").update({ pos_x, pos_y }).eq("id", memoId);
-    socket.to(boardId).emit("memo:moved", { memoId, pos_x, pos_y });
-  });
+  socket.on(
+    "memo:move",
+    async ({ memoId, boardId, pos_x, pos_y, group_id }) => {
+      if (user?.role === "Viewer") return;
+      await supabase
+        .from("memos")
+        .update({ pos_x, pos_y, group_id })
+        .eq("id", memoId);
+      socket.to(boardId).emit("memo:moved", { memoId, pos_x, pos_y, group_id });
+    },
+  );
 
   socket.on("drawing:stroke", ({ boardId, strokeData }) => {
     if (user?.role === "Viewer") return;

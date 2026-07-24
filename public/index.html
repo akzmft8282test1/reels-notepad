@@ -8,7 +8,7 @@
     <title>🎬 릴스 대회 아이디어 & 피그마 스튜디오 Pro</title>
     <script src="/socket.io/socket.io.js"></script>
 
-    <!-- Quill.js 서식 에디터 -->
+    <!-- Quill.js 에디터 -->
     <link
       href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
       rel="stylesheet" />
@@ -23,7 +23,8 @@
         --text: #0f172a;
         --border: #e2e8f0;
         --canvas-bg: #f8fafc;
-        --grid-color: rgba(203, 213, 225, 0.9);
+        --dot-color: rgba(203, 213, 225, 0.9);
+        --grid-line-color: rgba(203, 213, 225, 0.4);
         --shadow:
           0 10px 15px -3px rgba(0, 0, 0, 0.1),
           0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -35,7 +36,8 @@
         --text: #f8fafc;
         --border: #334155;
         --canvas-bg: #090d16;
-        --grid-color: rgba(51, 65, 85, 0.9);
+        --dot-color: rgba(51, 65, 85, 0.9);
+        --grid-line-color: rgba(51, 65, 85, 0.4);
         --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
       }
 
@@ -154,7 +156,9 @@
         margin-bottom: 12px;
         position: relative;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-        transition: box-shadow 0.2s, border 0.2s;
+        transition:
+          box-shadow 0.2s,
+          border 0.2s;
       }
       .card.selected,
       .canvas-card.selected,
@@ -214,20 +218,39 @@
         padding: 4px 8px;
         font-size: 0.8rem;
       }
-      
+
+      /* 기본: 점 격자(Dot Grid) */
       #canvasContainer {
         width: 3000px;
         height: 3000px;
         background-color: var(--canvas-bg);
-        background-image: radial-gradient(var(--grid-color) 1.5px, transparent 1.5px);
+        background-image: radial-gradient(
+          var(--dot-color) 1.5px,
+          transparent 1.5px
+        );
         background-size: 24px 24px;
         position: absolute;
         top: 0;
         left: 0;
         transform-origin: 0 0;
       }
-      #canvasContainer.grid-off {
-        background-image: none !important;
+
+      /* 그리드 모드 ON: 격자 줄(Grid Line)로 전환 */
+      #canvasContainer.grid-line-on {
+        background-image:
+          linear-gradient(
+            to right,
+            var(--grid-line-color) 1px,
+            transparent 1px
+          ),
+          linear-gradient(
+            to bottom,
+            var(--grid-line-color) 1px,
+            transparent 1px
+          ) !important;
+        background-size:
+          24px 24px,
+          24px 24px !important;
       }
 
       #paintCanvas,
@@ -239,11 +262,15 @@
         height: 100%;
       }
       #paintCanvas {
-        z-index: 1;
+        z-index: 5;
+        pointer-events: none; /* 기본 상태에서는 하위 요소 클릭 허용 */
+      }
+      #paintCanvas.active-draw {
+        pointer-events: auto; /* 펜/지우개 활성화 시 마우스 이벤트 수신 */
       }
       #svgConnectorLayer {
         z-index: 2;
-        pointer-events: auto;
+        pointer-events: none;
       }
       #svgConnectorLayer line {
         cursor: pointer;
@@ -287,7 +314,9 @@
         color: white;
         white-space: nowrap;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        transition: left 0.1s linear, top 0.1s linear;
+        transition:
+          left 0.1s linear,
+          top 0.1s linear;
       }
       .remote-cursor::before {
         content: "↖";
@@ -417,9 +446,14 @@
         z-index: 500;
         padding: 20px;
       }
-      .sidebar.open { right: 0; }
+      .sidebar.open {
+        right: 0;
+      }
 
-      input, textarea, select, button {
+      input,
+      textarea,
+      select,
+      button {
         width: 100%;
         padding: 10px;
         margin-top: 6px;
@@ -430,16 +464,15 @@
         font-size: 0.9rem;
       }
 
-      /* 💡 하단 히스토리 바 수치 및 노출 레이어 수정 (높이 위로 조정) */
       #timelineBar {
         position: absolute;
-        bottom: 70px; /* 기존 20px에서 70px로 끌어올림 */
+        bottom: 70px;
         left: 20px;
         background: var(--card-bg);
         border: 1px solid var(--border);
         padding: 8px 14px;
         border-radius: 12px;
-        z-index: 1000; /* 항상 위에 보이도록 z-index 설정 */
+        z-index: 1000;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -457,12 +490,22 @@
         <button class="btn" onclick="openAuditLogsModal()">📜 활동로그</button>
         <button class="btn" onclick="toggleTrashModal()">🗑️ 휴지통</button>
         <div id="onlineCount" class="online-users">접속자: 0명</div>
-        <button class="btn" style="border: none; font-size: 1.2rem" onclick="toggleSidebar()">☰</button>
+        <button
+          class="btn"
+          style="border: none; font-size: 1.2rem"
+          onclick="toggleSidebar()">
+          ☰
+        </button>
       </div>
     </header>
 
     <div id="sidebar" class="sidebar">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
         <h3>📌 게시판 목록</h3>
         <span style="cursor: pointer" onclick="toggleSidebar()">✕</span>
       </div>
@@ -470,27 +513,71 @@
       <hr style="border-color: var(--border)" />
       <h4>+ 새 게시판</h4>
       <input type="text" id="newBoardName" placeholder="게시판 이름" />
-      <button class="btn btn-primary" style="margin-top: 8px" onclick="createBoard()">게시판 생성</button>
-      <button class="btn btn-danger" style="margin-top: 8px" onclick="exportTXT()">📄 대본 TXT 내보내기</button>
-      <button class="btn" style="margin-top: 8px; background: #64748b; color: #fff" onclick="logout()">로그아웃</button>
+      <button
+        class="btn btn-primary"
+        style="margin-top: 8px"
+        onclick="createBoard()">
+        게시판 생성
+      </button>
+      <button
+        class="btn btn-danger"
+        style="margin-top: 8px"
+        onclick="exportTXT()">
+        📄 대본 TXT 내보내기
+      </button>
+      <button
+        class="btn"
+        style="margin-top: 8px; background: #64748b; color: #fff"
+        onclick="logout()">
+        로그아웃
+      </button>
     </div>
 
     <!-- 로그인 -->
-    <div id="loginView" style="max-width: 360px; margin: 80px auto; text-align: center">
+    <div
+      id="loginView"
+      style="max-width: 360px; margin: 80px auto; text-align: center">
       <h2>🔐 로그인</h2>
       <input type="text" id="username" placeholder="아이디" />
       <input type="password" id="password" placeholder="비밀번호" />
-      <button class="btn btn-primary" style="margin-top: 12px" onclick="login()">로그인</button>
+      <button
+        class="btn btn-primary"
+        style="margin-top: 12px"
+        onclick="login()">
+        로그인
+      </button>
     </div>
 
     <!-- 1. 칸반 보드 -->
-    <div id="kanbanView" style="max-width: 1200px; margin: 20px auto; padding: 0 15px; display: none;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div
+      id="kanbanView"
+      style="
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 15px;
+        display: none;
+      ">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
         <h2 id="currentBoardTitle">기본 게시판</h2>
         <div style="display: flex; gap: 6px">
-          <button class="btn btn-primary" onclick="openMemoModalWithType('hook')">⚡ 3초 후킹</button>
-          <button class="btn btn-blue" onclick="openMemoModalWithType('story')">📖 스토리</button>
-          <button class="btn btn-green" onclick="openMemoModalWithType('custom')">+ 자유 노드</button>
+          <button
+            class="btn btn-primary"
+            onclick="openMemoModalWithType('hook')">
+            ⚡ 3초 후킹
+          </button>
+          <button class="btn btn-blue" onclick="openMemoModalWithType('story')">
+            📖 스토리
+          </button>
+          <button
+            class="btn btn-green"
+            onclick="openMemoModalWithType('custom')">
+            + 자유 노드
+          </button>
         </div>
       </div>
 
@@ -517,24 +604,84 @@
     <!-- 2. 무한 캔버스 -->
     <div id="canvasView">
       <div id="canvasToolbar">
-        <button id="btnPan" class="btn tool-btn active" onclick="setTool('pan')">🖐️ 이동(H)</button>
-        <button id="btnSelect" class="btn tool-btn" onclick="setTool('select')">↖️ 선택(V)</button>
-        <button id="btnPen" class="btn tool-btn" onclick="setTool('pen')">✏️ 펜(P)</button>
-        <button id="btnEraser" class="btn tool-btn" onclick="setTool('eraser')">🧹 지우개</button>
-        <button id="btnConnector" class="btn tool-btn" onclick="setTool('connector')">🔗 연결선</button>
-        <button id="btnDeleteTool" class="btn tool-btn btn-danger" onclick="setTool('delete')">🗑️ 삭제도구</button>
-        
-        <button class="btn" style="background: #f59e0b; color: #fff" onclick="addShape('rect')">🟦 사각형</button>
-        <button class="btn" style="background: #8b5cf6; color: #fff" onclick="addShape('circle')">🟡 원형</button>
-        <button class="btn" style="background: #eab308; color: #000" onclick="addStickyNote('#fef08a')">🟨 메모</button>
-        
-        <button id="btnGridToggle" class="btn" onclick="toggleGridSnap()">📐 그리드: ON</button>
-        
-        <input type="color" id="penColor" value="#e1306c" style="width: 26px; height: 26px; border: none; cursor: pointer; padding: 0; background: none; flex-shrink: 0;" />
-        
-        <button class="btn btn-blue" onclick="autoLayoutMemos()">📐 자동정렬</button>
-        <button class="btn btn-primary" onclick="groupSelectedElements()">📦 그룹화</button>
-        <button class="btn btn-danger" onclick="clearDrawings()">그림 지우기</button>
+        <button
+          id="btnPan"
+          class="btn tool-btn active"
+          onclick="setTool('pan')">
+          🖐️ 이동(H)
+        </button>
+        <button id="btnSelect" class="btn tool-btn" onclick="setTool('select')">
+          ↖️ 선택(V)
+        </button>
+        <button id="btnPen" class="btn tool-btn" onclick="setTool('pen')">
+          ✏️ 펜(P)
+        </button>
+        <button id="btnEraser" class="btn tool-btn" onclick="setTool('eraser')">
+          🧹 지우개
+        </button>
+        <button
+          id="btnConnector"
+          class="btn tool-btn"
+          onclick="setTool('connector')">
+          🔗 연결선
+        </button>
+        <button
+          id="btnDeleteTool"
+          class="btn tool-btn btn-danger"
+          onclick="setTool('delete')">
+          🗑️ 삭제도구
+        </button>
+
+        <button
+          class="btn"
+          style="background: #f59e0b; color: #fff"
+          onclick="addShape('rect')">
+          🟦 사각형
+        </button>
+        <button
+          class="btn"
+          style="background: #8b5cf6; color: #fff"
+          onclick="addShape('circle')">
+          🟡 원형
+        </button>
+        <button
+          class="btn"
+          style="background: #eab308; color: #000"
+          onclick="addStickyNote('#fef08a')">
+          🟨 메모
+        </button>
+
+        <!-- 그리드 토글 및 캔버스 확장 버튼 -->
+        <button id="btnGridToggle" class="btn" onclick="toggleGridSnap()">
+          📐 격자줄: OFF
+        </button>
+        <button class="btn btn-blue" onclick="expandCanvas1000()">
+          📐 +1000px 확장
+        </button>
+
+        <input
+          type="color"
+          id="penColor"
+          value="#e1306c"
+          style="
+            width: 26px;
+            height: 26px;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+            flex-shrink: 0;
+          " />
+
+        <button class="btn btn-blue" onclick="autoLayoutMemos()">
+          📐 자동정렬
+        </button>
+        <button class="btn btn-primary" onclick="groupSelectedElements()">
+          📦 그룹화
+        </button>
+        <button class="btn btn-danger" onclick="clearDrawings()">
+          그림 지우기
+        </button>
       </div>
 
       <div id="canvasContainer">
@@ -545,21 +692,40 @@
 
       <div id="minimap"><div id="minimapViewport"></div></div>
 
-      <!-- 타임라인 & Undo/Redo 컨트롤 (상단으로 조정) -->
+      <!-- 타임라인 & Undo/Redo 컨트롤 -->
       <div id="timelineBar">
-        <button class="btn" style="padding:4px 8px;" onclick="undo()">↩️ Undo</button>
-        <button class="btn" style="padding:4px 8px;" onclick="redo()">↪️ Redo</button>
-        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px;">⏱️ 히스토리:</span>
-        <input type="range" id="historySlider" min="0" max="0" value="0" style="width: 120px" oninput="onHistorySliderChange(this.value)" />
+        <button class="btn" style="padding: 4px 8px" onclick="undo()">
+          ↩️ Undo
+        </button>
+        <button class="btn" style="padding: 4px 8px" onclick="redo()">
+          ↪️ Redo
+        </button>
+        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px"
+          >⏱️ 히스토리:</span
+        >
+        <input
+          type="range"
+          id="historySlider"
+          min="0"
+          max="0"
+          value="0"
+          style="width: 120px"
+          oninput="onHistorySliderChange(this.value)" />
       </div>
     </div>
 
     <!-- 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
-      <div onclick="contextAction('copy')"><span>📋 복사</span><small>Ctrl+C</small></div>
-      <div onclick="contextAction('duplicate')"><span>👯 복제</span><small>Ctrl+D</small></div>
+      <div onclick="contextAction('copy')">
+        <span>📋 복사</span><small>Ctrl+C</small>
+      </div>
+      <div onclick="contextAction('duplicate')">
+        <span>👯 복제</span><small>Ctrl+D</small>
+      </div>
       <div onclick="contextAction('lock')"><span>🔒 잠금 토글</span></div>
-      <div onclick="contextAction('delete')" style="color: #ef4444"><span>🗑️ 삭제</span><small>Del</small></div>
+      <div onclick="contextAction('delete')" style="color: #ef4444">
+        <span>🗑️ 삭제</span><small>Del</small>
+      </div>
     </div>
 
     <!-- 메모 작성/수정 모달 -->
@@ -568,7 +734,8 @@
         <h3>📝 메모/대본 작성</h3>
         <input type="hidden" id="editMemoId" />
         <label>제목</label><input type="text" id="editTitle" />
-        <label>카테고리</label><input type="text" id="editCategory" placeholder="#태그" />
+        <label>카테고리</label
+        ><input type="text" id="editCategory" placeholder="#태그" />
         <label>상태</label>
         <select id="editStatus">
           <option value="아이디어">💡 아이디어</option>
@@ -576,17 +743,32 @@
           <option value="촬영예정">🎥 촬영예정</option>
           <option value="완료">✅ 완료</option>
         </select>
-        <label>영상 URL</label><input type="text" id="editVideoUrl" placeholder="https://..." />
+        <label>영상 URL</label
+        ><input type="text" id="editVideoUrl" placeholder="https://..." />
         <label>BGM 음원명 / 링크</label>
         <div style="display: flex; gap: 5px">
           <input type="text" id="editBgmTitle" placeholder="음원명" />
           <input type="text" id="editBgmUrl" placeholder="URL" />
         </div>
         <label>대본</label>
-        <div id="quillEditor" style="height: 140px; background: #fff; color: #000; margin-top: 6px;"></div>
+        <div
+          id="quillEditor"
+          style="
+            height: 140px;
+            background: #fff;
+            color: #000;
+            margin-top: 6px;
+          "></div>
         <div style="display: flex; gap: 10px; margin-top: 15px">
-          <button class="btn btn-primary" onclick="saveMemoModal()">저장</button>
-          <button class="btn" style="background: #64748b; color: #fff" onclick="closeModal('memoModal')">취소</button>
+          <button class="btn btn-primary" onclick="saveMemoModal()">
+            저장
+          </button>
+          <button
+            class="btn"
+            style="background: #64748b; color: #fff"
+            onclick="closeModal('memoModal')">
+            취소
+          </button>
         </div>
       </div>
     </div>
@@ -595,23 +777,63 @@
     <div id="commentModal" class="modal-bg">
       <div class="modal">
         <h3>💬 댓글</h3>
-        <div id="commentList" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--border); padding: 8px; border-radius: 6px;"></div>
-        <textarea id="newCommentText" placeholder="댓글 입력..." rows="2"></textarea>
-        <button class="btn btn-primary" style="margin-top: 6px" onclick="submitComment()">작성</button>
-        <button class="btn" style="margin-top: 5px; background: #64748b; color: #fff" onclick="closeModal('commentModal')">닫기</button>
+        <div
+          id="commentList"
+          style="
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+          "></div>
+        <textarea
+          id="newCommentText"
+          placeholder="댓글 입력..."
+          rows="2"></textarea>
+        <button
+          class="btn btn-primary"
+          style="margin-top: 6px"
+          onclick="submitComment()">
+          작성
+        </button>
+        <button
+          class="btn"
+          style="margin-top: 5px; background: #64748b; color: #fff"
+          onclick="closeModal('commentModal')">
+          닫기
+        </button>
       </div>
     </div>
 
-    <!-- 📱 릴스 미리보기 모달 -->
+    <!-- 릴스 미리보기 모달 -->
     <div id="reelsModal" class="modal-bg">
       <div class="modal" style="background: transparent; box-shadow: none">
         <div class="reels-phone-frame">
-          <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 0.8rem;
+            ">
             <span id="reelsPreviewTitle">릴스 미리보기</span>
-            <span style="cursor: pointer" onclick="closeModal('reelsModal')">✕</span>
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
+              >✕</span
+            >
           </div>
-          <div id="reelsPreviewScript" style="text-align: center; padding: 20px; font-size: 1rem; font-weight: bold; background: rgba(0, 0, 0, 0.6); border-radius: 10px;"></div>
-          <div style="font-size: 0.8rem">🎵 <span id="reelsPreviewBgm">음원 정보 없음</span></div>
+          <div
+            id="reelsPreviewScript"
+            style="
+              text-align: center;
+              padding: 20px;
+              font-size: 1rem;
+              font-weight: bold;
+              background: rgba(0, 0, 0, 0.6);
+              border-radius: 10px;
+            "></div>
+          <div style="font-size: 0.8rem">
+            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
+          </div>
         </div>
       </div>
     </div>
@@ -620,8 +842,15 @@
     <div id="auditLogModal" class="modal-bg">
       <div class="modal">
         <h3>📜 활동 로그</h3>
-        <div id="auditLogModalBox" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem"></div>
-        <button class="btn" style="background: #64748b; color: #fff; margin-top: 10px" onclick="closeModal('auditLogModal')">닫기</button>
+        <div
+          id="auditLogModalBox"
+          style="max-height: 300px; overflow-y: auto; font-size: 0.8rem"></div>
+        <button
+          class="btn"
+          style="background: #64748b; color: #fff; margin-top: 10px"
+          onclick="closeModal('auditLogModal')">
+          닫기
+        </button>
       </div>
     </div>
 
@@ -630,7 +859,12 @@
       <div class="modal">
         <h3>🗑️ 휴지통</h3>
         <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
-        <button class="btn" style="background: #64748b; color: #fff; margin-top: 10px" onclick="closeModal('trashModal')">닫기</button>
+        <button
+          class="btn"
+          style="background: #64748b; color: #fff; margin-top: 10px"
+          onclick="closeModal('trashModal')">
+          닫기
+        </button>
       </div>
     </div>
 
@@ -645,7 +879,7 @@
       let quill = null;
       let activeView = "kanban";
       let currentTool = "pan";
-      
+
       let memosCache = {};
       let shapesCache = {};
       let stickyCache = {};
@@ -653,30 +887,40 @@
       let connectorsList = [];
       let connectorStartElem = null;
 
-      let isGridSnapEnabled = true;
+      let isGridLineMode = false;
 
-      let canvasWidth = parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
-      let canvasHeight = parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
+      let canvasWidth =
+        parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
+      let canvasHeight =
+        parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
 
-      let pCanvas = null, ctx = null;
-      let isDrawing = false, lastX = 0, lastY = 0;
-      let isPanning = false, panStart = { x: 0, y: 0 }, canvasPos = { x: 0, y: 0 }, zoomLevel = 1.0;
+      let pCanvas = null,
+        ctx = null;
+      let isDrawing = false,
+        lastX = 0,
+        lastY = 0;
+      let isPanning = false,
+        panStart = { x: 0, y: 0 },
+        canvasPos = { x: 0, y: 0 },
+        zoomLevel = 1.0;
 
-      let isBoxSelecting = false, boxStart = { x: 0, y: 0 };
+      let isBoxSelecting = false,
+        boxStart = { x: 0, y: 0 };
 
-      // Undo / Redo 구현용 스택
-      let undoStack = [];
-      let redoStack = [];
+      // 히스토리 스택
+      let historyStack = [];
+      let currentHistoryIndex = -1;
 
-      // 다크모드 초기화
       if (localStorage.getItem("theme_dark") === "true") {
         document.body.classList.add("dark-mode");
       }
 
       window.switchView = function (view) {
         activeView = view;
-        document.getElementById("kanbanView").style.display = view === "kanban" ? "block" : "none";
-        document.getElementById("canvasView").style.display = view === "canvas" ? "block" : "none";
+        document.getElementById("kanbanView").style.display =
+          view === "kanban" ? "block" : "none";
+        document.getElementById("canvasView").style.display =
+          view === "canvas" ? "block" : "none";
         if (view === "canvas") setTool("pan");
         if (currentBoardId) loadMemos();
       };
@@ -687,16 +931,37 @@
         localStorage.setItem("theme_dark", isDark ? "true" : "false");
       };
 
-      window.toggleGridSnap = function() {
-        isGridSnapEnabled = !isGridSnapEnabled;
+      // 점격자 <-> 격자줄(Line Grid) 전환
+      window.toggleGridSnap = function () {
+        isGridLineMode = !isGridLineMode;
         const btn = document.getElementById("btnGridToggle");
         const container = document.getElementById("canvasContainer");
-        if (isGridSnapEnabled) {
-          btn.innerText = "📐 그리드: ON";
-          container.classList.remove("grid-off");
+        if (isGridLineMode) {
+          btn.innerText = "📐 격자줄: ON";
+          container.classList.add("grid-line-on");
         } else {
-          btn.innerText = "📐 그리드: OFF";
-          container.classList.add("grid-off");
+          btn.innerText = "📐 격자줄: OFF";
+          container.classList.remove("grid-line-on");
+        }
+      };
+
+      // 캔버스 가로 세로 1000px 즉시 확장
+      window.expandCanvas1000 = function () {
+        canvasWidth += 1000;
+        canvasHeight += 1000;
+        localStorage.setItem("savedCanvasWidth", canvasWidth);
+        localStorage.setItem("savedCanvasHeight", canvasHeight);
+        applyCanvasSize(canvasWidth, canvasHeight);
+        if (currentBoardId) {
+          fetch("/api/boards/size", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              boardId: currentBoardId,
+              width: canvasWidth,
+              height: canvasHeight,
+            }),
+          });
         }
       };
 
@@ -704,10 +969,17 @@
         try {
           const res = await fetch("/api/logs");
           const logs = await res.json();
-          document.getElementById("auditLogModalBox").innerHTML = (Array.isArray(logs) ? logs : [])
-            .map((l) => `<div style="margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;"><b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})</div>`)
+          document.getElementById("auditLogModalBox").innerHTML = (
+            Array.isArray(logs) ? logs : []
+          )
+            .map(
+              (l) =>
+                `<div style="margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;"><b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})</div>`,
+            )
             .join("");
-        } catch (e) { console.error(e); }
+        } catch (e) {
+          console.error(e);
+        }
         document.getElementById("auditLogModal").style.display = "flex";
       };
 
@@ -716,10 +988,17 @@
         try {
           const res = await fetch(`/api/trash/${currentBoardId}`);
           const trashMemos = await res.json();
-          document.getElementById("trashList").innerHTML = (Array.isArray(trashMemos) ? trashMemos : [])
-            .map((t) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;"><span>${t.title}</span><button class="btn btn-primary" style="padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button></div>`)
+          document.getElementById("trashList").innerHTML = (
+            Array.isArray(trashMemos) ? trashMemos : []
+          )
+            .map(
+              (t) =>
+                `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;"><span>${t.title}</span><button class="btn btn-primary" style="padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button></div>`,
+            )
             .join("");
-        } catch (e) { console.error(e); }
+        } catch (e) {
+          console.error(e);
+        }
         document.getElementById("trashModal").style.display = "flex";
       };
 
@@ -776,8 +1055,17 @@
 
       window.setTool = function (tool) {
         currentTool = tool;
-        document.querySelectorAll(".tool-btn").forEach((btn) => btn.classList.remove("active"));
+        document
+          .querySelectorAll(".tool-btn")
+          .forEach((btn) => btn.classList.remove("active"));
         const canvasView = document.getElementById("canvasView");
+        const canvasEl = document.getElementById("paintCanvas");
+
+        if (tool === "pen" || tool === "eraser") {
+          canvasEl.classList.add("active-draw");
+        } else {
+          canvasEl.classList.remove("active-draw");
+        }
 
         if (tool === "pan") {
           document.getElementById("btnPan").classList.add("active");
@@ -801,9 +1089,13 @@
       };
 
       // 도형 생성
-      window.addShape = async function (type, shapeDataParam = null, isUndoAction = false) {
+      window.addShape = async function (
+        type,
+        shapeDataParam = null,
+        isUndoAction = false,
+      ) {
         if (!currentBoardId) return alert("게시판을 선택하세요.");
-        
+
         const shapeData = shapeDataParam || {
           id: "shape-" + Date.now(),
           board_id: currentBoardId,
@@ -824,7 +1116,7 @@
           const created = await res.json();
           renderSingleShape(created);
           if (!isUndoAction) {
-            pushUndoAction({ type: "ADD", itemType: "shape", data: created });
+            pushHistory({ type: "ADD", itemType: "shape", data: created });
           }
         }
       };
@@ -846,9 +1138,11 @@
         if (shape.type === "circle") el.style.borderRadius = "50%";
         else el.style.borderRadius = "8px";
 
+        if (shape.group_id) el.setAttribute("data-group-id", shape.group_id);
+
         makeDraggable(el);
-        
-        const clickHandler = (e) => {
+
+        el.onclick = (e) => {
           e.stopPropagation();
           if (currentTool === "delete") {
             deleteElementById(shape.id);
@@ -856,10 +1150,13 @@
           }
           handleElementClick(el, shape.id);
         };
-        el.onclick = clickHandler;
       }
 
-      window.addStickyNote = function (color, stickyDataParam = null, isUndoAction = false) {
+      window.addStickyNote = function (
+        color,
+        stickyDataParam = null,
+        isUndoAction = false,
+      ) {
         const stickyData = stickyDataParam || {
           id: "sticky-" + Date.now(),
           color: color,
@@ -871,7 +1168,7 @@
         renderSingleSticky(stickyData);
 
         if (!isUndoAction) {
-          pushUndoAction({ type: "ADD", itemType: "sticky", data: stickyData });
+          pushHistory({ type: "ADD", itemType: "sticky", data: stickyData });
         }
       };
 
@@ -890,7 +1187,11 @@
         note.value = data.content || "";
         note.placeholder = "아이디어 작성...";
 
-        note.oninput = () => { stickyCache[data.id].content = note.value; };
+        if (data.group_id) note.setAttribute("data-group-id", data.group_id);
+
+        note.oninput = () => {
+          stickyCache[data.id].content = note.value;
+        };
 
         makeDraggable(note);
         note.onclick = (e) => {
@@ -911,7 +1212,9 @@
       };
 
       window.autoLayoutMemos = function () {
-        const cards = Array.from(document.querySelectorAll("#canvasContainer .canvas-card"));
+        const cards = Array.from(
+          document.querySelectorAll("#canvasContainer .canvas-card"),
+        );
         cards.forEach((card, idx) => {
           const x = 100 + (idx % 4) * 280;
           const y = 100 + Math.floor(idx / 4) * 240;
@@ -919,17 +1222,40 @@
           card.style.top = `${y}px`;
           const id = card.dataset.id || card.id;
           if (memosCache[id]) {
-            socket.emit("memo:move", { memoId: id, boardId: currentBoardId, pos_x: x, pos_y: y });
+            socket.emit("memo:move", {
+              memoId: id,
+              boardId: currentBoardId,
+              pos_x: x,
+              pos_y: y,
+              group_id: card.getAttribute("data-group-id"),
+            });
           }
         });
         updateConnectors();
       };
 
+      // 그룹화 저장 및 반영
       window.groupSelectedElements = function () {
-        if (selectedElementsList.length < 2) return alert("2개 이상의 요소를 선택해주세요. (Shift+클릭 또는 드래그 선택)");
+        if (selectedElementsList.length < 2)
+          return alert(
+            "2개 이상의 요소를 선택해주세요. (Shift+클릭 또는 드래그 선택)",
+          );
         const groupId = "group-" + Date.now();
-        selectedElementsList.forEach((el) => el.setAttribute("data-group-id", groupId));
-        alert("선택한 요소들이 하나의 그룹으로 묶였습니다!");
+        selectedElementsList.forEach((el) => {
+          el.setAttribute("data-group-id", groupId);
+          const id = el.dataset.id || el.id;
+          if (memosCache[id]) {
+            socket.emit("memo:save", { ...memosCache[id], group_id: groupId });
+          } else if (shapesCache[id]) {
+            shapesCache[id].group_id = groupId;
+            fetch("/api/shapes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(shapesCache[id]),
+            });
+          }
+        });
+        alert("선택한 요소들이 성공적으로 그룹화되었습니다!");
       };
 
       async function deleteElementById(id, isUndoAction = false) {
@@ -953,12 +1279,18 @@
           deletedItemData = memosCache[id];
           deleteMemo(id, true);
         }
-        
+
         if (!isUndoAction && deletedItemData) {
-          pushUndoAction({ type: "DELETE", itemType: deletedItemType, data: deletedItemData });
+          pushHistory({
+            type: "DELETE",
+            itemType: deletedItemType,
+            data: deletedItemData,
+          });
         }
 
-        connectorsList = connectorsList.filter(c => c.start.id !== id && c.end.id !== id);
+        connectorsList = connectorsList.filter(
+          (c) => c.start_id !== id && c.end_id !== id,
+        );
         updateConnectors();
       }
 
@@ -1034,7 +1366,9 @@
         document.getElementById("editVideoUrl").value = memo.video_url || "";
         document.getElementById("editBgmTitle").value = memo.bgm_title || "";
         document.getElementById("editBgmUrl").value = memo.bgm_url || "";
-        quill.clipboard.dangerouslyPasteHTML(memo.rich_content || memo.script || "");
+        quill.clipboard.dangerouslyPasteHTML(
+          memo.rich_content || memo.script || "",
+        );
         document.getElementById("memoModal").style.display = "flex";
       };
 
@@ -1046,8 +1380,10 @@
 
       window.openReelsModal = function (title, script, bgm) {
         document.getElementById("reelsPreviewTitle").innerText = title;
-        document.getElementById("reelsPreviewScript").innerText = script || "대본 없음";
-        document.getElementById("reelsPreviewBgm").innerText = bgm || "기본 음원";
+        document.getElementById("reelsPreviewScript").innerText =
+          script || "대본 없음";
+        document.getElementById("reelsPreviewBgm").innerText =
+          bgm || "기본 음원";
         document.getElementById("reelsModal").style.display = "flex";
       };
 
@@ -1055,8 +1391,13 @@
         selectedMemoForComment = memoId;
         const res = await fetch(`/api/comments/${memoId}`);
         const comments = await res.json();
-        document.getElementById("commentList").innerHTML = (Array.isArray(comments) ? comments : [])
-          .map((c) => `<div style="font-size:0.8rem; margin-bottom:6px;"><b>${c.author}:</b> ${c.content}</div>`)
+        document.getElementById("commentList").innerHTML = (
+          Array.isArray(comments) ? comments : []
+        )
+          .map(
+            (c) =>
+              `<div style="font-size:0.8rem; margin-bottom:6px;"><b>${c.author}:</b> ${c.content}</div>`,
+          )
           .join("");
         document.getElementById("commentModal").style.display = "flex";
       };
@@ -1074,7 +1415,11 @@
       window.openMemoModalWithType = function (type) {
         document.getElementById("editMemoId").value = "";
         document.getElementById("editTitle").value =
-          type === "hook" ? "⚡ 3초 후킹 노드" : type === "story" ? "📖 스토리 노드" : "💡 아이디어 노드";
+          type === "hook"
+            ? "⚡ 3초 후킹 노드"
+            : type === "story"
+              ? "📖 스토리 노드"
+              : "💡 아이디어 노드";
         document.getElementById("editCategory").value = `#${type}`;
         quill.clipboard.dangerouslyPasteHTML("<p>[내용을 입력하세요]</p>");
         document.getElementById("memoModal").style.display = "flex";
@@ -1087,8 +1432,17 @@
             el.style.outline = "2px solid #3b82f6";
           } else {
             if (connectorStartElem !== el) {
-              const connObj = { id: "conn-" + Date.now(), start: connectorStartElem, end: el };
+              const startId =
+                connectorStartElem.id || connectorStartElem.dataset.id;
+              const endId = el.id || el.dataset.id;
+              const connObj = {
+                id: "conn-" + Date.now(),
+                board_id: currentBoardId,
+                start_id: startId,
+                end_id: endId,
+              };
               connectorsList.push(connObj);
+              saveConnector(connObj);
               updateConnectors();
             }
             connectorStartElem.style.outline = "";
@@ -1102,11 +1456,14 @@
 
         const groupId = el.getAttribute("data-group-id");
         if (groupId) {
-          const groupMembers = Array.from(document.querySelectorAll(`[data-group-id="${groupId}"]`));
+          const groupMembers = Array.from(
+            document.querySelectorAll(`[data-group-id="${groupId}"]`),
+          );
           selectedElementsList = groupMembers;
         } else {
           if (window.event && window.event.shiftKey) {
-            if (!selectedElementsList.includes(el)) selectedElementsList.push(el);
+            if (!selectedElementsList.includes(el))
+              selectedElementsList.push(el);
           } else {
             selectedElementsList = [el];
           }
@@ -1114,15 +1471,27 @@
         highlightSelectedElements();
       }
 
+      function saveConnector(conn) {
+        fetch("/api/connectors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(conn),
+        });
+      }
+
       function highlightSelectedElements() {
-        document.querySelectorAll(".card, .canvas-card, .sticky-note").forEach((el) => el.classList.remove("selected"));
+        document
+          .querySelectorAll(".card, .canvas-card, .sticky-note")
+          .forEach((el) => el.classList.remove("selected"));
         selectedElementsList.forEach((el) => el.classList.add("selected"));
       }
 
       function getPointerPos(e) {
         const rect = pCanvas.getBoundingClientRect();
-        const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+        const clientX =
+          e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+        const clientY =
+          e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
         return {
           x: (clientX - rect.left) / zoomLevel,
           y: (clientY - rect.top) / zoomLevel,
@@ -1179,7 +1548,9 @@
           lastY = pos.y;
         };
 
-        const stopDraw = () => { isDrawing = false; };
+        const stopDraw = () => {
+          isDrawing = false;
+        };
 
         pCanvas.addEventListener("mousedown", startDraw);
         pCanvas.addEventListener("mousemove", moveDraw);
@@ -1192,14 +1563,18 @@
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
-        canvasView.addEventListener("wheel", (e) => {
-          if (e.ctrlKey) {
-            e.preventDefault();
-            zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
-            zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
-            updateCanvasTransform();
-          }
-        }, { passive: false });
+        canvasView.addEventListener(
+          "wheel",
+          (e) => {
+            if (e.ctrlKey) {
+              e.preventDefault();
+              zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
+              zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
+              updateCanvasTransform();
+            }
+          },
+          { passive: false },
+        );
 
         canvasView.addEventListener("mousemove", (e) => {
           if (currentBoardId && currentUser) {
@@ -1212,8 +1587,10 @@
           }
 
           if (isBoxSelecting) {
-            const currentX = (e.clientX - container.getBoundingClientRect().left) / zoomLevel;
-            const currentY = (e.clientY - container.getBoundingClientRect().top) / zoomLevel;
+            const currentX =
+              (e.clientX - container.getBoundingClientRect().left) / zoomLevel;
+            const currentY =
+              (e.clientY - container.getBoundingClientRect().top) / zoomLevel;
             const box = document.getElementById("dragSelectBox");
             const left = Math.min(boxStart.x, currentX);
             const top = Math.min(boxStart.y, currentY);
@@ -1226,13 +1603,22 @@
             box.style.height = `${height}px`;
 
             selectedElementsList = [];
-            document.querySelectorAll("#canvasContainer .canvas-card, #canvasContainer .sticky-note").forEach((el) => {
-              const ex = parseFloat(el.style.left) || 0;
-              const ey = parseFloat(el.style.top) || 0;
-              if (ex >= left && ex <= left + width && ey >= top && ey <= top + height) {
-                selectedElementsList.push(el);
-              }
-            });
+            document
+              .querySelectorAll(
+                "#canvasContainer .canvas-card, #canvasContainer .sticky-note",
+              )
+              .forEach((el) => {
+                const ex = parseFloat(el.style.left) || 0;
+                const ey = parseFloat(el.style.top) || 0;
+                if (
+                  ex >= left &&
+                  ex <= left + width &&
+                  ey >= top &&
+                  ey <= top + height
+                ) {
+                  selectedElementsList.push(el);
+                }
+              });
             highlightSelectedElements();
           }
         });
@@ -1264,7 +1650,9 @@
         };
 
         canvasView.addEventListener("mousedown", onContainerPointerDown);
-        canvasView.addEventListener("touchstart", onContainerPointerDown, { passive: false });
+        canvasView.addEventListener("touchstart", onContainerPointerDown, {
+          passive: false,
+        });
 
         const onContainerPointerMove = (e) => {
           if (isPanning) {
@@ -1277,7 +1665,9 @@
         };
 
         window.addEventListener("mousemove", onContainerPointerMove);
-        window.addEventListener("touchmove", onContainerPointerMove, { passive: false });
+        window.addEventListener("touchmove", onContainerPointerMove, {
+          passive: false,
+        });
 
         const onContainerPointerUp = () => {
           if (isPanning) {
@@ -1311,11 +1701,17 @@
         });
 
         window.addEventListener("keydown", (e) => {
-          if (["input", "textarea"].includes(document.activeElement.tagName.toLowerCase())) return;
+          if (
+            ["input", "textarea"].includes(
+              document.activeElement.tagName.toLowerCase(),
+            )
+          )
+            return;
           if (e.key.toLowerCase() === "v") setTool("select");
           if (e.key.toLowerCase() === "h") setTool("pan");
           if (e.key.toLowerCase() === "p") setTool("pen");
-          if (e.key === "Delete" || e.key === "Backspace") contextAction("delete");
+          if (e.key === "Delete" || e.key === "Backspace")
+            contextAction("delete");
           if (e.ctrlKey && e.key.toLowerCase() === "z") undo();
           if (e.ctrlKey && e.key.toLowerCase() === "y") redo();
         });
@@ -1331,7 +1727,8 @@
 
       function updateMinimap() {
         const viewport = document.getElementById("minimapViewport");
-        const ratioX = 160 / canvasWidth, ratioY = 120 / canvasHeight;
+        const ratioX = 160 / canvasWidth,
+          ratioY = 120 / canvasHeight;
         viewport.style.width = `${(window.innerWidth / zoomLevel) * ratioX}px`;
         viewport.style.height = `${(window.innerHeight / zoomLevel) * ratioY}px`;
         viewport.style.left = `${Math.max(0, -canvasPos.x * ratioX)}px`;
@@ -1339,17 +1736,23 @@
       }
 
       function makeDraggable(element) {
-        let isDragging = false, offsetLeft = 0, offsetTop = 0;
+        let isDragging = false,
+          offsetLeft = 0,
+          offsetTop = 0;
         let startPos = { x: 0, y: 0 };
 
         const startDrag = (e) => {
-          if (currentTool !== "select" || element.classList.contains("locked")) return;
+          if (currentTool !== "select" || element.classList.contains("locked"))
+            return;
           isDragging = true;
           const clientX = e.touches ? e.touches[0].clientX : e.clientX;
           const clientY = e.touches ? e.touches[0].clientY : e.clientY;
           offsetLeft = clientX / zoomLevel - element.offsetLeft;
           offsetTop = clientY / zoomLevel - element.offsetTop;
-          startPos = { x: parseInt(element.style.left) || 0, y: parseInt(element.style.top) || 0 };
+          startPos = {
+            x: parseInt(element.style.left) || 0,
+            y: parseInt(element.style.top) || 0,
+          };
         };
 
         const moveDrag = (e) => {
@@ -1358,11 +1761,6 @@
           const clientY = e.touches ? e.touches[0].clientY : e.clientY;
           let newX = clientX / zoomLevel - offsetLeft;
           let newY = clientY / zoomLevel - offsetTop;
-
-          if (isGridSnapEnabled) {
-            newX = Math.round(newX / 20) * 20;
-            newY = Math.round(newY / 20) * 20;
-          }
 
           const dx = newX - parseFloat(element.style.left || 0);
           const dy = newY - parseFloat(element.style.top || 0);
@@ -1384,16 +1782,21 @@
           if (isDragging) {
             isDragging = false;
             const id = element.dataset.id || element.id;
-            const endPos = { x: parseInt(element.style.left), y: parseInt(element.style.top) };
+            const endPos = {
+              x: parseInt(element.style.left),
+              y: parseInt(element.style.top),
+            };
 
             if (startPos.x !== endPos.x || startPos.y !== endPos.y) {
-              pushUndoAction({
+              pushHistory({
                 type: "MOVE",
                 id: id,
                 from: startPos,
-                to: endPos
+                to: endPos,
               });
             }
+
+            const groupId = element.getAttribute("data-group-id");
 
             if (memosCache[id]) {
               socket.emit("memo:move", {
@@ -1401,10 +1804,12 @@
                 boardId: currentBoardId,
                 pos_x: endPos.x,
                 pos_y: endPos.y,
+                group_id: groupId,
               });
             } else if (shapesCache[id]) {
               shapesCache[id].pos_x = endPos.x;
               shapesCache[id].pos_y = endPos.y;
+              shapesCache[id].group_id = groupId;
               fetch("/api/shapes", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -1413,6 +1818,7 @@
             } else if (stickyCache[id]) {
               stickyCache[id].pos_x = endPos.x;
               stickyCache[id].pos_y = endPos.y;
+              stickyCache[id].group_id = groupId;
             }
           }
         };
@@ -1429,14 +1835,22 @@
       function updateConnectors() {
         const svg = document.getElementById("svgConnectorLayer");
         svg.innerHTML = "";
-        connectorsList.forEach((conn, index) => {
-          if (!conn.start || !conn.end) return;
-          const x1 = parseFloat(conn.start.style.left) + conn.start.offsetWidth / 2;
-          const y1 = parseFloat(conn.start.style.top) + conn.start.offsetHeight / 2;
-          const x2 = parseFloat(conn.end.style.left) + conn.end.offsetWidth / 2;
-          const y2 = parseFloat(conn.end.style.top) + conn.end.offsetHeight / 2;
+        connectorsList.forEach((conn) => {
+          const startElem = document.getElementById(conn.start_id);
+          const endElem = document.getElementById(conn.end_id);
+          if (!startElem || !endElem) return;
 
-          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          const x1 =
+            parseFloat(startElem.style.left) + startElem.offsetWidth / 2;
+          const y1 =
+            parseFloat(startElem.style.top) + startElem.offsetHeight / 2;
+          const x2 = parseFloat(endElem.style.left) + endElem.offsetWidth / 2;
+          const y2 = parseFloat(endElem.style.top) + endElem.offsetHeight / 2;
+
+          const line = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "line",
+          );
           line.setAttribute("x1", x1);
           line.setAttribute("y1", y1);
           line.setAttribute("x2", x2);
@@ -1448,7 +1862,8 @@
           line.onclick = (e) => {
             e.stopPropagation();
             if (confirm("이 연결선을 삭제하시겠습니까?")) {
-              connectorsList.splice(index, 1);
+              fetch(`/api/connectors/${conn.id}`, { method: "DELETE" });
+              connectorsList = connectorsList.filter((c) => c.id !== conn.id);
               updateConnectors();
             }
           };
@@ -1468,39 +1883,36 @@
         updateMinimap();
       }
 
-      // 💡 정교화된 Undo / Redo 스택 및 상태 업데이트 로직
-      function pushUndoAction(action) {
-        undoStack.push(action);
-        redoStack = []; // 새로운 동작 발생 시 redo 초기화
+      // 히스토리 보충 로직
+      function pushHistory(action) {
+        if (currentHistoryIndex < historyStack.length - 1) {
+          historyStack = historyStack.slice(0, currentHistoryIndex + 1);
+        }
+        historyStack.push(action);
+        currentHistoryIndex++;
         updateSliderUI();
       }
 
       function updateSliderUI() {
         const slider = document.getElementById("historySlider");
-        slider.max = undoStack.length;
-        slider.value = undoStack.length;
+        slider.max = Math.max(0, historyStack.length - 1);
+        slider.value = currentHistoryIndex;
       }
 
-      window.undo = async function() {
-        if (!undoStack.length) return;
-        const act = undoStack.pop();
-        redoStack.push(act);
+      window.undo = async function () {
+        if (currentHistoryIndex < 0) return;
+        const act = historyStack[currentHistoryIndex];
+        currentHistoryIndex--;
         updateSliderUI();
 
         if (act.type === "ADD") {
-          // 추가했던 객체를 화면에서 다시 제거
           deleteElementById(act.data.id, true);
         } else if (act.type === "DELETE") {
-          // 삭제했던 객체 복원
-          if (act.itemType === "shape") {
-            addShape(act.data.type, act.data, true);
-          } else if (act.itemType === "sticky") {
+          if (act.itemType === "shape") addShape(act.data.type, act.data, true);
+          else if (act.itemType === "sticky")
             addStickyNote(act.data.color, act.data, true);
-          } else if (act.itemType === "memo") {
-            await restoreMemo(act.data.id);
-          }
+          else if (act.itemType === "memo") await restoreMemo(act.data.id);
         } else if (act.type === "MOVE") {
-          // 이전을 이전 위치로 대입
           const el = document.getElementById(act.id);
           if (el) {
             el.style.left = `${act.from.x}px`;
@@ -1510,18 +1922,16 @@
         }
       };
 
-      window.redo = async function() {
-        if (!redoStack.length) return;
-        const act = redoStack.pop();
-        undoStack.push(act);
+      window.redo = async function () {
+        if (currentHistoryIndex >= historyStack.length - 1) return;
+        currentHistoryIndex++;
+        const act = historyStack[currentHistoryIndex];
         updateSliderUI();
 
         if (act.type === "ADD") {
-          if (act.itemType === "shape") {
-            addShape(act.data.type, act.data, true);
-          } else if (act.itemType === "sticky") {
+          if (act.itemType === "shape") addShape(act.data.type, act.data, true);
+          else if (act.itemType === "sticky")
             addStickyNote(act.data.color, act.data, true);
-          }
         } else if (act.type === "DELETE") {
           deleteElementById(act.data.id, true);
         } else if (act.type === "MOVE") {
@@ -1535,10 +1945,9 @@
       };
 
       window.onHistorySliderChange = function (val) {
-        // 슬라이더를 뒤로 이동시킬 때 Undo 실행
-        while (undoStack.length > val) {
-          undo();
-        }
+        const targetIndex = parseInt(val);
+        while (currentHistoryIndex > targetIndex) undo();
+        while (currentHistoryIndex < targetIndex) redo();
       };
 
       async function init() {
@@ -1551,7 +1960,9 @@
             switchView("kanban");
             loadBoards();
           }
-        } catch (e) { console.error(e); }
+        } catch (e) {
+          console.error(e);
+        }
       }
 
       async function loadBoards() {
@@ -1563,7 +1974,8 @@
         if (Array.isArray(boards)) {
           boards.forEach((board, idx) => {
             const li = document.createElement("li");
-            li.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:6px 0;";
+            li.style.cssText =
+              "display:flex; justify-content:space-between; align-items:center; padding:6px 0;";
             li.innerHTML = `<span style="cursor:pointer;" onclick="selectBoard('${board.id}', '${board.name}')">${board.name}</span>`;
             if ((idx === 0 && !currentBoardId) || currentBoardId === board.id) {
               selectBoard(board.id, board.name);
@@ -1579,13 +1991,24 @@
         socket.emit("board:join", id);
         loadMemos();
         loadShapes();
+        loadConnectors();
       }
 
       async function loadShapes() {
         if (!currentBoardId) return;
         const res = await fetch(`/api/shapes/${currentBoardId}`);
         const shapes = await res.json();
-        (Array.isArray(shapes) ? shapes : []).forEach((shape) => renderSingleShape(shape));
+        (Array.isArray(shapes) ? shapes : []).forEach((shape) =>
+          renderSingleShape(shape),
+        );
+      }
+
+      async function loadConnectors() {
+        if (!currentBoardId) return;
+        const res = await fetch(`/api/connectors/${currentBoardId}`);
+        const conns = await res.json();
+        connectorsList = Array.isArray(conns) ? conns : [];
+        updateConnectors();
       }
 
       async function loadMemos() {
@@ -1604,7 +2027,9 @@
 
         memos.forEach((memo) => {
           memosCache[memo.id] = memo;
-          const colEl = document.getElementById(`col-${memo.status}`) || document.getElementById("col-아이디어");
+          const colEl =
+            document.getElementById(`col-${memo.status}`) ||
+            document.getElementById("col-아이디어");
           const card = document.createElement("div");
           card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
           card.dataset.id = memo.id;
@@ -1627,7 +2052,9 @@
 
       function renderCanvas(memos) {
         const container = document.getElementById("canvasContainer");
-        container.querySelectorAll(".canvas-card:not(.shape-element)").forEach((c) => c.remove());
+        container
+          .querySelectorAll(".canvas-card:not(.shape-element)")
+          .forEach((c) => c.remove());
 
         memos.forEach((memo, index) => {
           memosCache[memo.id] = memo;
@@ -1637,6 +2064,8 @@
           card.id = memo.id;
           card.style.left = `${memo.pos_x || 100 + (index % 4) * 280}px`;
           card.style.top = `${memo.pos_y || 100 + Math.floor(index / 4) * 240}px`;
+
+          if (memo.group_id) card.setAttribute("data-group-id", memo.group_id);
 
           card.innerHTML = `
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1658,10 +2087,12 @@
           };
           container.appendChild(card);
         });
+        updateConnectors();
       }
 
       socket.on("presence:update", (users) => {
-        document.getElementById("onlineCount").innerText = `접속자: ${users.length}명`;
+        document.getElementById("onlineCount").innerText =
+          `접속자: ${users.length}명`;
       });
 
       socket.on("cursor:moved", ({ socketId, name, x, y }) => {
@@ -1689,16 +2120,28 @@
         if (el) el.remove();
       });
 
+      socket.on("connector:updated", (conn) => {
+        if (!connectorsList.find((c) => c.id === conn.id)) {
+          connectorsList.push(conn);
+          updateConnectors();
+        }
+      });
+      socket.on("connector:deleted", (id) => {
+        connectorsList = connectorsList.filter((c) => c.id !== id);
+        updateConnectors();
+      });
+
       socket.on("memo:updated", () => loadMemos());
-      socket.on("memo:moved", ({ memoId, pos_x, pos_y }) => {
+      socket.on("memo:moved", ({ memoId, pos_x, pos_y, group_id }) => {
         const el = document.getElementById(memoId);
         if (el) {
           el.style.left = `${pos_x}px`;
           el.style.top = `${pos_y}px`;
+          if (group_id) el.setAttribute("data-group-id", group_id);
           updateConnectors();
         }
       });
-      
+
       socket.on("drawing:stroke", (s) => {
         if (!ctx) return;
         ctx.beginPath();
@@ -1715,7 +2158,10 @@
         ctx.lineCap = "round";
         ctx.stroke();
       });
-      socket.on("drawing:cleared", () => ctx && ctx.clearRect(0, 0, pCanvas.width, pCanvas.height));
+      socket.on(
+        "drawing:cleared",
+        () => ctx && ctx.clearRect(0, 0, pCanvas.width, pCanvas.height),
+      );
     </script>
   </body>
 </html>
