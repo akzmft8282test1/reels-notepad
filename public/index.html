@@ -23,7 +23,7 @@
         --text: #0f172a;
         --border: #e2e8f0;
         --canvas-bg: #f8fafc;
-        --grid-color: #cbd5e1;
+        --grid-color: rgba(203, 213, 225, 0.9);
         --shadow:
           0 10px 15px -3px rgba(0, 0, 0, 0.1),
           0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -35,7 +35,7 @@
         --text: #f8fafc;
         --border: #334155;
         --canvas-bg: #090d16;
-        --grid-color: #334155;
+        --grid-color: rgba(51, 65, 85, 0.9);
         --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
       }
 
@@ -85,7 +85,6 @@
         font-weight: 600;
       }
 
-      /* 헤더/공통 버튼 UI 개선 */
       .btn {
         padding: 6px 12px;
         border-radius: 8px;
@@ -99,7 +98,7 @@
         align-items: center;
         gap: 4px;
         transition: all 0.2s;
-        white-space: nowrap; /* 글자 줄바꿈 방지 */
+        white-space: nowrap;
       }
       .btn:hover {
         opacity: 0.9;
@@ -189,7 +188,6 @@
         overflow-y: auto;
       }
 
-      /* Canvas UI 및 툴바 컴팩트 스타일링 */
       #canvasView {
         display: none;
         width: 100vw;
@@ -218,6 +216,7 @@
         padding: 4px 8px;
         font-size: 0.8rem;
       }
+
       #canvasContainer {
         width: 3000px;
         height: 3000px;
@@ -232,6 +231,10 @@
         left: 0;
         transform-origin: 0 0;
       }
+      #canvasContainer.grid-off {
+        background-image: none !important;
+      }
+
       #paintCanvas,
       #svgConnectorLayer {
         position: absolute;
@@ -245,12 +248,20 @@
       }
       #svgConnectorLayer {
         z-index: 2;
-        pointer-events: none;
+        pointer-events: auto; /* 선 클릭/삭제를 위해 연동 */
+      }
+      #svgConnectorLayer line {
+        cursor: pointer;
+        pointer-events: visibleStroke;
+      }
+      #svgConnectorLayer line:hover {
+        stroke: #ef4444;
+        stroke-width: 5;
       }
 
       .canvas-card {
         position: absolute;
-        min-width: 240px;
+        min-width: 200px;
         background: var(--card-bg);
         color: var(--text);
         border-radius: 12px;
@@ -260,13 +271,13 @@
         z-index: 10;
         resize: both;
         overflow: auto;
+        touch-action: none;
       }
       .canvas-card.locked {
         border-style: dashed;
         opacity: 0.8;
       }
 
-      /* 실시간 접속자 커서 */
       .remote-cursor {
         position: absolute;
         pointer-events: none;
@@ -302,9 +313,9 @@
         border: 1px solid rgba(0, 0, 0, 0.05);
         resize: both;
         outline: none;
+        touch-action: none;
       }
 
-      /* 드래그 다중선택 박스 */
       #dragSelectBox {
         display: none;
         position: absolute;
@@ -431,19 +442,18 @@
         font-size: 0.9rem;
       }
 
-      /* 타임라인 히스토리 슬라이더 컨테이너 */
       #timelineBar {
         position: absolute;
         bottom: 20px;
         left: 20px;
         background: var(--card-bg);
         border: 1px solid var(--border);
-        padding: 10px 16px;
+        padding: 8px 14px;
         border-radius: 12px;
         z-index: 500;
         display: flex;
         align-items: center;
-        gap: 10px;
+        gap: 8px;
         box-shadow: var(--shadow);
       }
     </style>
@@ -594,6 +604,13 @@
           🔗 연결선
         </button>
         <button
+          id="btnDeleteTool"
+          class="btn tool-btn btn-danger"
+          onclick="setTool('delete')">
+          🗑️ 삭제도구
+        </button>
+
+        <button
           class="btn"
           style="background: #f59e0b; color: #fff"
           onclick="addShape('rect')">
@@ -611,6 +628,11 @@
           onclick="addStickyNote('#fef08a')">
           🟨 메모
         </button>
+
+        <button id="btnGridToggle" class="btn" onclick="toggleGridSnap()">
+          📐 그리드: ON
+        </button>
+
         <input
           type="color"
           id="penColor"
@@ -624,6 +646,7 @@
             background: none;
             flex-shrink: 0;
           " />
+
         <button class="btn btn-blue" onclick="autoLayoutMemos()">
           📐 자동정렬
         </button>
@@ -643,16 +666,24 @@
 
       <div id="minimap"><div id="minimapViewport"></div></div>
 
-      <!-- 타임라인 슬라이더 -->
+      <!-- 타임라인 & Undo/Redo 컨트롤 -->
       <div id="timelineBar">
-        <span style="font-size: 0.8rem; font-weight: bold">⏱️ 히스토리:</span>
+        <button class="btn" style="padding: 2px 6px" onclick="undo()">
+          ↩️ Undo
+        </button>
+        <button class="btn" style="padding: 2px 6px" onclick="redo()">
+          ↪️ Redo
+        </button>
+        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px"
+          >⏱️ 히스토리:</span
+        >
         <input
           type="range"
           id="historySlider"
           min="0"
           max="0"
           value="0"
-          style="width: 120px"
+          style="width: 100px"
           oninput="onHistorySliderChange(this.value)" />
       </div>
     </div>
@@ -749,7 +780,7 @@
       </div>
     </div>
 
-    <!-- 📱 9:16 미리보기 모달 -->
+    <!-- 📱 릴스 미리보기 모달 -->
     <div id="reelsModal" class="modal-bg">
       <div class="modal" style="background: transparent; box-shadow: none">
         <div class="reels-phone-frame">
@@ -822,11 +853,14 @@
       let quill = null;
       let activeView = "kanban";
       let currentTool = "pan";
+
       let memosCache = {};
       let shapesCache = {};
       let selectedElementsList = [];
       let connectorsList = [];
       let connectorStartElem = null;
+
+      let isGridSnapEnabled = true;
 
       let canvasWidth =
         parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
@@ -843,12 +877,18 @@
         canvasPos = { x: 0, y: 0 },
         zoomLevel = 1.0;
 
-      // 영역 드래그 전용 변수
       let isBoxSelecting = false,
         boxStart = { x: 0, y: 0 };
 
-      // 히스토리 타임라인 데이터
+      // Undo / Redo 스택
+      let undoStack = [];
+      let redoStack = [];
       let localHistoryStack = [];
+
+      // 다크모드 초기화
+      if (localStorage.getItem("theme_dark") === "true") {
+        document.body.classList.add("dark-mode");
+      }
 
       window.switchView = function (view) {
         activeView = view;
@@ -862,6 +902,21 @@
 
       window.toggleDarkMode = function () {
         document.body.classList.toggle("dark-mode");
+        const isDark = document.body.classList.contains("dark-mode");
+        localStorage.setItem("theme_dark", isDark ? "true" : "false");
+      };
+
+      window.toggleGridSnap = function () {
+        isGridSnapEnabled = !isGridSnapEnabled;
+        const btn = document.getElementById("btnGridToggle");
+        const container = document.getElementById("canvasContainer");
+        if (isGridSnapEnabled) {
+          btn.innerText = "📐 그리드: ON";
+          container.classList.remove("grid-off");
+        } else {
+          btn.innerText = "📐 그리드: OFF";
+          container.classList.add("grid-off");
+        }
       };
 
       window.openAuditLogsModal = async function () {
@@ -974,9 +1029,13 @@
         } else if (tool === "connector") {
           document.getElementById("btnConnector").classList.add("active");
           canvasView.style.cursor = "alias";
+        } else if (tool === "delete") {
+          document.getElementById("btnDeleteTool").classList.add("active");
+          canvasView.style.cursor = "not-allowed";
         }
       };
 
+      // 도형 생성 버그 수정 및 서버 연동
       window.addShape = async function (type) {
         if (!currentBoardId) return alert("게시판을 선택하세요.");
         const shapeData = {
@@ -987,7 +1046,7 @@
           pos_y: Math.round(300 - canvasPos.y),
           width: 120,
           height: 120,
-          color: document.getElementById("penColor").value,
+          color: document.getElementById("penColor").value || "#e1306c",
         };
 
         const res = await fetch("/api/shapes", {
@@ -998,6 +1057,8 @@
         if (res.ok) {
           const created = await res.json();
           renderSingleShape(created);
+          pushUndoAction({ type: "create_shape", data: created });
+          pushHistoryState("도형 생성");
         }
       };
 
@@ -1012,16 +1073,23 @@
         }
         el.style.left = `${shape.pos_x}px`;
         el.style.top = `${shape.pos_y}px`;
-        el.style.width = `${shape.width}px`;
-        el.style.height = `${shape.height}px`;
+        el.style.width = `${shape.width || 120}px`;
+        el.style.height = `${shape.height || 120}px`;
         el.style.background = shape.color;
         if (shape.type === "circle") el.style.borderRadius = "50%";
+        else el.style.borderRadius = "8px";
 
         makeDraggable(el);
-        el.onclick = (e) => {
+
+        const clickHandler = (e) => {
           e.stopPropagation();
+          if (currentTool === "delete") {
+            deleteElementById(shape.id);
+            return;
+          }
           handleElementClick(el, shape.id);
         };
+        el.onclick = clickHandler;
       }
 
       window.addStickyNote = function (color) {
@@ -1037,9 +1105,14 @@
         makeDraggable(note);
         note.onclick = (e) => {
           e.stopPropagation();
+          if (currentTool === "delete") {
+            deleteElementById(id);
+            return;
+          }
           handleElementClick(note, id);
         };
         document.getElementById("canvasContainer").appendChild(note);
+        pushUndoAction({ type: "create_sticky", id: id });
         pushHistoryState("스티키노트 추가");
       };
 
@@ -1074,23 +1147,34 @@
 
       window.groupSelectedElements = function () {
         if (selectedElementsList.length < 2)
-          return alert("2개 이상의 요소를 선택해주세요. (Shift+클릭)");
+          return alert(
+            "2개 이상의 요소를 선택해주세요. (Shift+클릭 또는 드래그 선택)",
+          );
         const groupId = "group-" + Date.now();
         selectedElementsList.forEach((el) =>
           el.setAttribute("data-group-id", groupId),
         );
-        alert("선택한 요소들이 그룹화 되었습니다!");
+        alert("선택한 요소들이 하나의 그룹으로 묶였습니다!");
       };
 
-      window.focusElement = function (element) {
-        if (!element) return;
-        const x = parseFloat(element.style.left) || 0;
-        const y = parseFloat(element.style.top) || 0;
-        zoomLevel = 1.2;
-        canvasPos.x = -(x - window.innerWidth / 2);
-        canvasPos.y = -(y - window.innerHeight / 2);
-        updateCanvasTransform();
-      };
+      async function deleteElementById(id) {
+        const el = document.getElementById(id);
+        if (id.startsWith("shape-")) {
+          await fetch(`/api/shapes/${id}`, { method: "DELETE" });
+          if (el) el.remove();
+          delete shapesCache[id];
+        } else if (id.startsWith("sticky-")) {
+          if (el) el.remove();
+        } else if (memosCache[id]) {
+          deleteMemo(id);
+        }
+
+        // 해당 요소에 연결된 서티 커넥터 삭제
+        connectorsList = connectorsList.filter(
+          (c) => c.start.id !== id && c.end.id !== id,
+        );
+        updateConnectors();
+      }
 
       window.contextAction = async function (type) {
         if (type === "copy" && activeSelectedMemoId) {
@@ -1113,21 +1197,8 @@
         } else if (type === "lock" && activeSelectedElement) {
           activeSelectedElement.classList.toggle("locked");
         } else if (type === "delete") {
-          if (
-            activeSelectedElement &&
-            activeSelectedElement.id.startsWith("shape-")
-          ) {
-            await fetch(`/api/shapes/${activeSelectedElement.id}`, {
-              method: "DELETE",
-            });
-            activeSelectedElement.remove();
-          } else if (
-            activeSelectedElement &&
-            activeSelectedElement.classList.contains("sticky-note")
-          ) {
-            activeSelectedElement.remove();
-          } else if (activeSelectedMemoId) {
-            deleteMemo(activeSelectedMemoId);
+          if (activeSelectedElement) {
+            deleteElementById(activeSelectedElement.id || activeSelectedMemoId);
           }
           activeSelectedElement = null;
           activeSelectedMemoId = null;
@@ -1223,10 +1294,6 @@
         loadMemos();
       };
 
-      window.likeMemo = function (memoId) {
-        socket.emit("memo:like", { memoId, boardId: currentBoardId });
-      };
-
       window.openMemoModalWithType = function (type) {
         document.getElementById("editMemoId").value = "";
         document.getElementById("editTitle").value =
@@ -1247,7 +1314,12 @@
             el.style.outline = "2px solid #3b82f6";
           } else {
             if (connectorStartElem !== el) {
-              connectorsList.push({ start: connectorStartElem, end: el });
+              const connObj = {
+                id: "conn-" + Date.now(),
+                start: connectorStartElem,
+                end: el,
+              };
+              connectorsList.push(connObj);
               updateConnectors();
             }
             connectorStartElem.style.outline = "";
@@ -1259,10 +1331,20 @@
         activeSelectedElement = el;
         activeSelectedMemoId = id;
 
-        if (window.event && window.event.shiftKey) {
-          if (!selectedElementsList.includes(el)) selectedElementsList.push(el);
+        // 그룹원 연동 선택 처리
+        const groupId = el.getAttribute("data-group-id");
+        if (groupId) {
+          const groupMembers = Array.from(
+            document.querySelectorAll(`[data-group-id="${groupId}"]`),
+          );
+          selectedElementsList = groupMembers;
         } else {
-          selectedElementsList = [el];
+          if (window.event && window.event.shiftKey) {
+            if (!selectedElementsList.includes(el))
+              selectedElementsList.push(el);
+          } else {
+            selectedElementsList = [el];
+          }
         }
         highlightSelectedElements();
       }
@@ -1276,8 +1358,10 @@
 
       function getPointerPos(e) {
         const rect = pCanvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        const clientX =
+          e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+        const clientY =
+          e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
         return {
           x: (clientX - rect.left) / zoomLevel,
           y: (clientY - rect.top) / zoomLevel,
@@ -1409,22 +1493,23 @@
           }
         });
 
-        canvasView.addEventListener("mousedown", (e) => {
+        // 캔버스 드래그 및 마우스 다운 바인딩
+        const onContainerPointerDown = (e) => {
           if (e.target.closest(".canvas-card, .sticky-note")) return;
+
+          const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+          const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
           if (currentTool === "pan") {
             isPanning = true;
-            panStart = {
-              x: e.clientX - canvasPos.x,
-              y: e.clientY - canvasPos.y,
-            };
+            panStart = { x: clientX - canvasPos.x, y: clientY - canvasPos.y };
             canvasView.style.cursor = "grabbing";
           } else if (currentTool === "select") {
             isBoxSelecting = true;
             const rect = container.getBoundingClientRect();
             boxStart = {
-              x: (e.clientX - rect.left) / zoomLevel,
-              y: (e.clientY - rect.top) / zoomLevel,
+              x: (clientX - rect.left) / zoomLevel,
+              y: (clientY - rect.top) / zoomLevel,
             };
             const box = document.getElementById("dragSelectBox");
             box.style.left = `${boxStart.x}px`;
@@ -1433,17 +1518,29 @@
             box.style.height = "0px";
             box.style.display = "block";
           }
+        };
+
+        canvasView.addEventListener("mousedown", onContainerPointerDown);
+        canvasView.addEventListener("touchstart", onContainerPointerDown, {
+          passive: false,
         });
 
-        window.addEventListener("mousemove", (e) => {
+        const onContainerPointerMove = (e) => {
           if (isPanning) {
-            canvasPos.x = e.clientX - panStart.x;
-            canvasPos.y = e.clientY - panStart.y;
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            canvasPos.x = clientX - panStart.x;
+            canvasPos.y = clientY - panStart.y;
             updateCanvasTransform();
           }
+        };
+
+        window.addEventListener("mousemove", onContainerPointerMove);
+        window.addEventListener("touchmove", onContainerPointerMove, {
+          passive: false,
         });
 
-        window.addEventListener("mouseup", () => {
+        const onContainerPointerUp = () => {
           if (isPanning) {
             isPanning = false;
             if (currentTool === "pan") canvasView.style.cursor = "grab";
@@ -1452,7 +1549,10 @@
             isBoxSelecting = false;
             document.getElementById("dragSelectBox").style.display = "none";
           }
-        });
+        };
+
+        window.addEventListener("mouseup", onContainerPointerUp);
+        window.addEventListener("touchend", onContainerPointerUp);
 
         window.addEventListener("contextmenu", (e) => {
           e.preventDefault();
@@ -1483,28 +1583,8 @@
           if (e.key.toLowerCase() === "p") setTool("pen");
           if (e.key === "Delete" || e.key === "Backspace")
             contextAction("delete");
-        });
-
-        window.addEventListener("dragover", (e) => e.preventDefault());
-        window.addEventListener("drop", (e) => {
-          e.preventDefault();
-          const files = e.dataTransfer.files;
-          if (!files.length) return;
-          Array.from(files).forEach((file) => {
-            const url = URL.createObjectURL(file);
-            const card = document.createElement("div");
-            card.className = "canvas-card";
-            card.style.left = `${(e.clientX - canvasPos.x) / zoomLevel}px`;
-            card.style.top = `${(e.clientY - canvasPos.y) / zoomLevel}px`;
-
-            if (file.type.startsWith("image/")) {
-              card.innerHTML = `<img src="${url}" style="max-width:200px; border-radius:6px;">`;
-            } else if (file.type.startsWith("video/")) {
-              card.innerHTML = `<video src="${url}" controls style="max-width:220px; border-radius:6px;"></video>`;
-            }
-            makeDraggable(card);
-            document.getElementById("canvasContainer").appendChild(card);
-          });
+          if (e.ctrlKey && e.key.toLowerCase() === "z") undo();
+          if (e.ctrlKey && e.key.toLowerCase() === "y") redo();
         });
 
         init();
@@ -1548,8 +1628,10 @@
           let newX = clientX / zoomLevel - offsetLeft;
           let newY = clientY / zoomLevel - offsetTop;
 
-          newX = Math.round(newX / 20) * 20;
-          newY = Math.round(newY / 20) * 20;
+          if (isGridSnapEnabled) {
+            newX = Math.round(newX / 20) * 20;
+            newY = Math.round(newY / 20) * 20;
+          }
 
           const dx = newX - parseFloat(element.style.left || 0);
           const dy = newY - parseFloat(element.style.top || 0);
@@ -1602,7 +1684,8 @@
       function updateConnectors() {
         const svg = document.getElementById("svgConnectorLayer");
         svg.innerHTML = "";
-        connectorsList.forEach((conn) => {
+        connectorsList.forEach((conn, index) => {
+          if (!conn.start || !conn.end) return;
           const x1 =
             parseFloat(conn.start.style.left) + conn.start.offsetWidth / 2;
           const y1 =
@@ -1621,6 +1704,16 @@
           line.setAttribute("stroke", "#e1306c");
           line.setAttribute("stroke-width", "3");
           line.setAttribute("stroke-dasharray", "5,5");
+
+          // 클릭 시 연결선 지우기 기능 제공
+          line.onclick = (e) => {
+            e.stopPropagation();
+            if (confirm("이 연결선을 삭제하시겠습니까?")) {
+              connectorsList.splice(index, 1);
+              updateConnectors();
+            }
+          };
+
           svg.appendChild(line);
         });
       }
@@ -1635,6 +1728,35 @@
         }
         updateMinimap();
       }
+
+      // Undo / Redo 기능 구현
+      function pushUndoAction(action) {
+        undoStack.push(action);
+        redoStack = [];
+      }
+
+      window.undo = function () {
+        if (!undoStack.length) return;
+        const act = undoStack.pop();
+        redoStack.push(act);
+
+        if (act.type === "create_shape") {
+          deleteElementById(act.data.id);
+        } else if (act.type === "create_sticky") {
+          const el = document.getElementById(act.id);
+          if (el) el.remove();
+        }
+      };
+
+      window.redo = function () {
+        if (!redoStack.length) return;
+        const act = redoStack.pop();
+        undoStack.push(act);
+
+        if (act.type === "create_shape") {
+          renderSingleShape(act.data);
+        }
+      };
 
       function pushHistoryState(action) {
         localHistoryStack.push({
@@ -1768,6 +1890,10 @@
           makeDraggable(card);
           card.onclick = (e) => {
             e.stopPropagation();
+            if (currentTool === "delete") {
+              deleteElementById(memo.id);
+              return;
+            }
             handleElementClick(card, memo.id);
           };
           container.appendChild(card);
@@ -1813,6 +1939,7 @@
           updateConnectors();
         }
       });
+
       socket.on("drawing:stroke", (s) => {
         if (!ctx) return;
         ctx.beginPath();
