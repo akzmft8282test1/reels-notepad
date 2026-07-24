@@ -99,6 +99,7 @@
         align-items: center;
         gap: 4px;
         transition: all 0.2s;
+        white-space: nowrap; /* 글자 줄바꿈 방지 */
       }
       .btn:hover {
         opacity: 0.9;
@@ -188,7 +189,7 @@
         overflow-y: auto;
       }
 
-      /* Canvas UI 및 툴바 */
+      /* Canvas UI 및 툴바 컴팩트 스타일링 */
       #canvasView {
         display: none;
         width: 100vw;
@@ -196,6 +197,26 @@
         overflow: hidden;
         position: relative;
         touch-action: none;
+      }
+      #canvasToolbar {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 100;
+        display: flex;
+        gap: 4px;
+        background: var(--card-bg);
+        padding: 4px 6px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        align-items: center;
+        max-width: calc(100vw - 24px);
+        overflow-x: auto;
+      }
+      #canvasToolbar .btn {
+        padding: 4px 8px;
+        font-size: 0.8rem;
       }
       #canvasContainer {
         width: 3000px;
@@ -550,22 +571,7 @@
 
     <!-- 2. 무한 캔버스 -->
     <div id="canvasView">
-      <div
-        style="
-          position: absolute;
-          top: 12px;
-          left: 12px;
-          z-index: 100;
-          display: flex;
-          gap: 6px;
-          background: var(--card-bg);
-          padding: 8px;
-          border-radius: 12px;
-          border: 1px solid var(--border);
-          box-shadow: var(--shadow);
-          flex-wrap: wrap;
-          align-items: center;
-        ">
+      <div id="canvasToolbar">
         <button
           id="btnPan"
           class="btn tool-btn active"
@@ -610,12 +616,13 @@
           id="penColor"
           value="#e1306c"
           style="
-            width: 32px;
-            height: 32px;
+            width: 26px;
+            height: 26px;
             border: none;
             cursor: pointer;
             padding: 0;
             background: none;
+            flex-shrink: 0;
           " />
         <button class="btn btn-blue" onclick="autoLayoutMemos()">
           📐 자동정렬
@@ -970,7 +977,6 @@
         }
       };
 
-      // 도형 백엔드 연동 추가 (저장/삭제 처리)
       window.addShape = async function (type) {
         if (!currentBoardId) return alert("게시판을 선택하세요.");
         const shapeData = {
@@ -1044,7 +1050,6 @@
         }
       };
 
-      // 자동 정렬 기능 (Auto Layout)
       window.autoLayoutMemos = function () {
         const cards = Array.from(
           document.querySelectorAll("#canvasContainer .canvas-card"),
@@ -1067,7 +1072,6 @@
         updateConnectors();
       };
 
-      // 그룹화 기능
       window.groupSelectedElements = function () {
         if (selectedElementsList.length < 2)
           return alert("2개 이상의 요소를 선택해주세요. (Shift+클릭)");
@@ -1078,7 +1082,6 @@
         alert("선택한 요소들이 그룹화 되었습니다!");
       };
 
-      // 스마트 줌 (Focus Zoom)
       window.focusElement = function (element) {
         if (!element) return;
         const x = parseFloat(element.style.left) || 0;
@@ -1271,7 +1274,6 @@
         selectedElementsList.forEach((el) => el.classList.add("selected"));
       }
 
-      // 모바일 터치 및 마우스 포인터 이벤트 통합
       function getPointerPos(e) {
         const rect = pCanvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -1291,7 +1293,6 @@
 
         applyCanvasSize(canvasWidth, canvasHeight);
 
-        // --- 터치 / 마우스 드로잉 모바일 최적화 ---
         const startDraw = (e) => {
           if (currentTool !== "pen" && currentTool !== "eraser") return;
           isDrawing = true;
@@ -1345,7 +1346,6 @@
         pCanvas.addEventListener("touchmove", moveDraw, { passive: false });
         window.addEventListener("touchend", stopDraw);
 
-        // --- 캔버스 뷰 드래그 선택 & 펜더 휠 줌 ---
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
@@ -1485,7 +1485,6 @@
             contextAction("delete");
         });
 
-        // 스마트 이미지 / 파일 드래그앤드롭
         window.addEventListener("dragover", (e) => e.preventDefault());
         window.addEventListener("drop", (e) => {
           e.preventDefault();
@@ -1527,7 +1526,6 @@
         viewport.style.top = `${Math.max(0, -canvasPos.y * ratioY)}px`;
       }
 
-      // 그리드 스냅 연동 드래그
       function makeDraggable(element) {
         let isDragging = false,
           offsetLeft = 0,
@@ -1550,14 +1548,12 @@
           let newX = clientX / zoomLevel - offsetLeft;
           let newY = clientY / zoomLevel - offsetTop;
 
-          // 20px 그리드 스냅 적용
           newX = Math.round(newX / 20) * 20;
           newY = Math.round(newY / 20) * 20;
 
           const dx = newX - parseFloat(element.style.left || 0);
           const dy = newY - parseFloat(element.style.top || 0);
 
-          // 다중 선택 그룹 이동 동기화
           if (selectedElementsList.includes(element)) {
             selectedElementsList.forEach((el) => {
               el.style.left = `${(parseFloat(el.style.left) || 0) + dx}px`;
@@ -1603,7 +1599,6 @@
         window.addEventListener("touchend", stopDrag);
       }
 
-      // SVG 연결선(Connector) 그리기
       function updateConnectors() {
         const svg = document.getElementById("svgConnectorLayer");
         svg.innerHTML = "";
@@ -1779,7 +1774,6 @@
         });
       }
 
-      // 접속자 커서 (실제 로그인 유저만)
       socket.on("presence:update", (users) => {
         document.getElementById("onlineCount").innerText =
           `접속자: ${users.length}명`;
