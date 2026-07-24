@@ -154,9 +154,7 @@
         margin-bottom: 12px;
         position: relative;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
-        transition:
-          box-shadow 0.2s,
-          border 0.2s;
+        transition: box-shadow 0.2s, border 0.2s;
       }
       .card.selected,
       .canvas-card.selected,
@@ -216,15 +214,12 @@
         padding: 4px 8px;
         font-size: 0.8rem;
       }
-
+      
       #canvasContainer {
         width: 3000px;
         height: 3000px;
         background-color: var(--canvas-bg);
-        background-image: radial-gradient(
-          var(--grid-color) 1.5px,
-          transparent 1.5px
-        );
+        background-image: radial-gradient(var(--grid-color) 1.5px, transparent 1.5px);
         background-size: 24px 24px;
         position: absolute;
         top: 0;
@@ -248,7 +243,7 @@
       }
       #svgConnectorLayer {
         z-index: 2;
-        pointer-events: auto; /* 선 클릭/삭제를 위해 연동 */
+        pointer-events: auto;
       }
       #svgConnectorLayer line {
         cursor: pointer;
@@ -292,9 +287,7 @@
         color: white;
         white-space: nowrap;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-        transition:
-          left 0.1s linear,
-          top 0.1s linear;
+        transition: left 0.1s linear, top 0.1s linear;
       }
       .remote-cursor::before {
         content: "↖";
@@ -424,14 +417,9 @@
         z-index: 500;
         padding: 20px;
       }
-      .sidebar.open {
-        right: 0;
-      }
+      .sidebar.open { right: 0; }
 
-      input,
-      textarea,
-      select,
-      button {
+      input, textarea, select, button {
         width: 100%;
         padding: 10px;
         margin-top: 6px;
@@ -442,15 +430,16 @@
         font-size: 0.9rem;
       }
 
+      /* 💡 하단 히스토리 바 수치 및 노출 레이어 수정 (높이 위로 조정) */
       #timelineBar {
         position: absolute;
-        bottom: 20px;
+        bottom: 70px; /* 기존 20px에서 70px로 끌어올림 */
         left: 20px;
         background: var(--card-bg);
         border: 1px solid var(--border);
         padding: 8px 14px;
         border-radius: 12px;
-        z-index: 500;
+        z-index: 1000; /* 항상 위에 보이도록 z-index 설정 */
         display: flex;
         align-items: center;
         gap: 8px;
@@ -468,22 +457,12 @@
         <button class="btn" onclick="openAuditLogsModal()">📜 활동로그</button>
         <button class="btn" onclick="toggleTrashModal()">🗑️ 휴지통</button>
         <div id="onlineCount" class="online-users">접속자: 0명</div>
-        <button
-          class="btn"
-          style="border: none; font-size: 1.2rem"
-          onclick="toggleSidebar()">
-          ☰
-        </button>
+        <button class="btn" style="border: none; font-size: 1.2rem" onclick="toggleSidebar()">☰</button>
       </div>
     </header>
 
     <div id="sidebar" class="sidebar">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        ">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
         <h3>📌 게시판 목록</h3>
         <span style="cursor: pointer" onclick="toggleSidebar()">✕</span>
       </div>
@@ -491,71 +470,27 @@
       <hr style="border-color: var(--border)" />
       <h4>+ 새 게시판</h4>
       <input type="text" id="newBoardName" placeholder="게시판 이름" />
-      <button
-        class="btn btn-primary"
-        style="margin-top: 8px"
-        onclick="createBoard()">
-        게시판 생성
-      </button>
-      <button
-        class="btn btn-danger"
-        style="margin-top: 8px"
-        onclick="exportTXT()">
-        📄 대본 TXT 내보내기
-      </button>
-      <button
-        class="btn"
-        style="margin-top: 8px; background: #64748b; color: #fff"
-        onclick="logout()">
-        로그아웃
-      </button>
+      <button class="btn btn-primary" style="margin-top: 8px" onclick="createBoard()">게시판 생성</button>
+      <button class="btn btn-danger" style="margin-top: 8px" onclick="exportTXT()">📄 대본 TXT 내보내기</button>
+      <button class="btn" style="margin-top: 8px; background: #64748b; color: #fff" onclick="logout()">로그아웃</button>
     </div>
 
     <!-- 로그인 -->
-    <div
-      id="loginView"
-      style="max-width: 360px; margin: 80px auto; text-align: center">
+    <div id="loginView" style="max-width: 360px; margin: 80px auto; text-align: center">
       <h2>🔐 로그인</h2>
       <input type="text" id="username" placeholder="아이디" />
       <input type="password" id="password" placeholder="비밀번호" />
-      <button
-        class="btn btn-primary"
-        style="margin-top: 12px"
-        onclick="login()">
-        로그인
-      </button>
+      <button class="btn btn-primary" style="margin-top: 12px" onclick="login()">로그인</button>
     </div>
 
     <!-- 1. 칸반 보드 -->
-    <div
-      id="kanbanView"
-      style="
-        max-width: 1200px;
-        margin: 20px auto;
-        padding: 0 15px;
-        display: none;
-      ">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        ">
+    <div id="kanbanView" style="max-width: 1200px; margin: 20px auto; padding: 0 15px; display: none;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
         <h2 id="currentBoardTitle">기본 게시판</h2>
         <div style="display: flex; gap: 6px">
-          <button
-            class="btn btn-primary"
-            onclick="openMemoModalWithType('hook')">
-            ⚡ 3초 후킹
-          </button>
-          <button class="btn btn-blue" onclick="openMemoModalWithType('story')">
-            📖 스토리
-          </button>
-          <button
-            class="btn btn-green"
-            onclick="openMemoModalWithType('custom')">
-            + 자유 노드
-          </button>
+          <button class="btn btn-primary" onclick="openMemoModalWithType('hook')">⚡ 3초 후킹</button>
+          <button class="btn btn-blue" onclick="openMemoModalWithType('story')">📖 스토리</button>
+          <button class="btn btn-green" onclick="openMemoModalWithType('custom')">+ 자유 노드</button>
         </div>
       </div>
 
@@ -582,80 +517,24 @@
     <!-- 2. 무한 캔버스 -->
     <div id="canvasView">
       <div id="canvasToolbar">
-        <button
-          id="btnPan"
-          class="btn tool-btn active"
-          onclick="setTool('pan')">
-          🖐️ 이동(H)
-        </button>
-        <button id="btnSelect" class="btn tool-btn" onclick="setTool('select')">
-          ↖️ 선택(V)
-        </button>
-        <button id="btnPen" class="btn tool-btn" onclick="setTool('pen')">
-          ✏️ 펜(P)
-        </button>
-        <button id="btnEraser" class="btn tool-btn" onclick="setTool('eraser')">
-          🧹 지우개
-        </button>
-        <button
-          id="btnConnector"
-          class="btn tool-btn"
-          onclick="setTool('connector')">
-          🔗 연결선
-        </button>
-        <button
-          id="btnDeleteTool"
-          class="btn tool-btn btn-danger"
-          onclick="setTool('delete')">
-          🗑️ 삭제도구
-        </button>
-
-        <button
-          class="btn"
-          style="background: #f59e0b; color: #fff"
-          onclick="addShape('rect')">
-          🟦 사각형
-        </button>
-        <button
-          class="btn"
-          style="background: #8b5cf6; color: #fff"
-          onclick="addShape('circle')">
-          🟡 원형
-        </button>
-        <button
-          class="btn"
-          style="background: #eab308; color: #000"
-          onclick="addStickyNote('#fef08a')">
-          🟨 메모
-        </button>
-
-        <button id="btnGridToggle" class="btn" onclick="toggleGridSnap()">
-          📐 그리드: ON
-        </button>
-
-        <input
-          type="color"
-          id="penColor"
-          value="#e1306c"
-          style="
-            width: 26px;
-            height: 26px;
-            border: none;
-            cursor: pointer;
-            padding: 0;
-            background: none;
-            flex-shrink: 0;
-          " />
-
-        <button class="btn btn-blue" onclick="autoLayoutMemos()">
-          📐 자동정렬
-        </button>
-        <button class="btn btn-primary" onclick="groupSelectedElements()">
-          📦 그룹화
-        </button>
-        <button class="btn btn-danger" onclick="clearDrawings()">
-          그림 지우기
-        </button>
+        <button id="btnPan" class="btn tool-btn active" onclick="setTool('pan')">🖐️ 이동(H)</button>
+        <button id="btnSelect" class="btn tool-btn" onclick="setTool('select')">↖️ 선택(V)</button>
+        <button id="btnPen" class="btn tool-btn" onclick="setTool('pen')">✏️ 펜(P)</button>
+        <button id="btnEraser" class="btn tool-btn" onclick="setTool('eraser')">🧹 지우개</button>
+        <button id="btnConnector" class="btn tool-btn" onclick="setTool('connector')">🔗 연결선</button>
+        <button id="btnDeleteTool" class="btn tool-btn btn-danger" onclick="setTool('delete')">🗑️ 삭제도구</button>
+        
+        <button class="btn" style="background: #f59e0b; color: #fff" onclick="addShape('rect')">🟦 사각형</button>
+        <button class="btn" style="background: #8b5cf6; color: #fff" onclick="addShape('circle')">🟡 원형</button>
+        <button class="btn" style="background: #eab308; color: #000" onclick="addStickyNote('#fef08a')">🟨 메모</button>
+        
+        <button id="btnGridToggle" class="btn" onclick="toggleGridSnap()">📐 그리드: ON</button>
+        
+        <input type="color" id="penColor" value="#e1306c" style="width: 26px; height: 26px; border: none; cursor: pointer; padding: 0; background: none; flex-shrink: 0;" />
+        
+        <button class="btn btn-blue" onclick="autoLayoutMemos()">📐 자동정렬</button>
+        <button class="btn btn-primary" onclick="groupSelectedElements()">📦 그룹화</button>
+        <button class="btn btn-danger" onclick="clearDrawings()">그림 지우기</button>
       </div>
 
       <div id="canvasContainer">
@@ -666,40 +545,21 @@
 
       <div id="minimap"><div id="minimapViewport"></div></div>
 
-      <!-- 타임라인 & Undo/Redo 컨트롤 -->
+      <!-- 타임라인 & Undo/Redo 컨트롤 (상단으로 조정) -->
       <div id="timelineBar">
-        <button class="btn" style="padding: 2px 6px" onclick="undo()">
-          ↩️ Undo
-        </button>
-        <button class="btn" style="padding: 2px 6px" onclick="redo()">
-          ↪️ Redo
-        </button>
-        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px"
-          >⏱️ 히스토리:</span
-        >
-        <input
-          type="range"
-          id="historySlider"
-          min="0"
-          max="0"
-          value="0"
-          style="width: 100px"
-          oninput="onHistorySliderChange(this.value)" />
+        <button class="btn" style="padding:4px 8px;" onclick="undo()">↩️ Undo</button>
+        <button class="btn" style="padding:4px 8px;" onclick="redo()">↪️ Redo</button>
+        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px;">⏱️ 히스토리:</span>
+        <input type="range" id="historySlider" min="0" max="0" value="0" style="width: 120px" oninput="onHistorySliderChange(this.value)" />
       </div>
     </div>
 
     <!-- 우클릭 컨텍스트 메뉴 -->
     <div id="contextMenu">
-      <div onclick="contextAction('copy')">
-        <span>📋 복사</span><small>Ctrl+C</small>
-      </div>
-      <div onclick="contextAction('duplicate')">
-        <span>👯 복제</span><small>Ctrl+D</small>
-      </div>
+      <div onclick="contextAction('copy')"><span>📋 복사</span><small>Ctrl+C</small></div>
+      <div onclick="contextAction('duplicate')"><span>👯 복제</span><small>Ctrl+D</small></div>
       <div onclick="contextAction('lock')"><span>🔒 잠금 토글</span></div>
-      <div onclick="contextAction('delete')" style="color: #ef4444">
-        <span>🗑️ 삭제</span><small>Del</small>
-      </div>
+      <div onclick="contextAction('delete')" style="color: #ef4444"><span>🗑️ 삭제</span><small>Del</small></div>
     </div>
 
     <!-- 메모 작성/수정 모달 -->
@@ -708,8 +568,7 @@
         <h3>📝 메모/대본 작성</h3>
         <input type="hidden" id="editMemoId" />
         <label>제목</label><input type="text" id="editTitle" />
-        <label>카테고리</label
-        ><input type="text" id="editCategory" placeholder="#태그" />
+        <label>카테고리</label><input type="text" id="editCategory" placeholder="#태그" />
         <label>상태</label>
         <select id="editStatus">
           <option value="아이디어">💡 아이디어</option>
@@ -717,32 +576,17 @@
           <option value="촬영예정">🎥 촬영예정</option>
           <option value="완료">✅ 완료</option>
         </select>
-        <label>영상 URL</label
-        ><input type="text" id="editVideoUrl" placeholder="https://..." />
+        <label>영상 URL</label><input type="text" id="editVideoUrl" placeholder="https://..." />
         <label>BGM 음원명 / 링크</label>
         <div style="display: flex; gap: 5px">
           <input type="text" id="editBgmTitle" placeholder="음원명" />
           <input type="text" id="editBgmUrl" placeholder="URL" />
         </div>
         <label>대본</label>
-        <div
-          id="quillEditor"
-          style="
-            height: 140px;
-            background: #fff;
-            color: #000;
-            margin-top: 6px;
-          "></div>
+        <div id="quillEditor" style="height: 140px; background: #fff; color: #000; margin-top: 6px;"></div>
         <div style="display: flex; gap: 10px; margin-top: 15px">
-          <button class="btn btn-primary" onclick="saveMemoModal()">
-            저장
-          </button>
-          <button
-            class="btn"
-            style="background: #64748b; color: #fff"
-            onclick="closeModal('memoModal')">
-            취소
-          </button>
+          <button class="btn btn-primary" onclick="saveMemoModal()">저장</button>
+          <button class="btn" style="background: #64748b; color: #fff" onclick="closeModal('memoModal')">취소</button>
         </div>
       </div>
     </div>
@@ -751,32 +595,10 @@
     <div id="commentModal" class="modal-bg">
       <div class="modal">
         <h3>💬 댓글</h3>
-        <div
-          id="commentList"
-          style="
-            max-height: 200px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-            border: 1px solid var(--border);
-            padding: 8px;
-            border-radius: 6px;
-          "></div>
-        <textarea
-          id="newCommentText"
-          placeholder="댓글 입력..."
-          rows="2"></textarea>
-        <button
-          class="btn btn-primary"
-          style="margin-top: 6px"
-          onclick="submitComment()">
-          작성
-        </button>
-        <button
-          class="btn"
-          style="margin-top: 5px; background: #64748b; color: #fff"
-          onclick="closeModal('commentModal')">
-          닫기
-        </button>
+        <div id="commentList" style="max-height: 200px; overflow-y: auto; margin-bottom: 10px; border: 1px solid var(--border); padding: 8px; border-radius: 6px;"></div>
+        <textarea id="newCommentText" placeholder="댓글 입력..." rows="2"></textarea>
+        <button class="btn btn-primary" style="margin-top: 6px" onclick="submitComment()">작성</button>
+        <button class="btn" style="margin-top: 5px; background: #64748b; color: #fff" onclick="closeModal('commentModal')">닫기</button>
       </div>
     </div>
 
@@ -784,30 +606,12 @@
     <div id="reelsModal" class="modal-bg">
       <div class="modal" style="background: transparent; box-shadow: none">
         <div class="reels-phone-frame">
-          <div
-            style="
-              display: flex;
-              justify-content: space-between;
-              font-size: 0.8rem;
-            ">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem;">
             <span id="reelsPreviewTitle">릴스 미리보기</span>
-            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
-              >✕</span
-            >
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')">✕</span>
           </div>
-          <div
-            id="reelsPreviewScript"
-            style="
-              text-align: center;
-              padding: 20px;
-              font-size: 1rem;
-              font-weight: bold;
-              background: rgba(0, 0, 0, 0.6);
-              border-radius: 10px;
-            "></div>
-          <div style="font-size: 0.8rem">
-            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
-          </div>
+          <div id="reelsPreviewScript" style="text-align: center; padding: 20px; font-size: 1rem; font-weight: bold; background: rgba(0, 0, 0, 0.6); border-radius: 10px;"></div>
+          <div style="font-size: 0.8rem">🎵 <span id="reelsPreviewBgm">음원 정보 없음</span></div>
         </div>
       </div>
     </div>
@@ -816,15 +620,8 @@
     <div id="auditLogModal" class="modal-bg">
       <div class="modal">
         <h3>📜 활동 로그</h3>
-        <div
-          id="auditLogModalBox"
-          style="max-height: 300px; overflow-y: auto; font-size: 0.8rem"></div>
-        <button
-          class="btn"
-          style="background: #64748b; color: #fff; margin-top: 10px"
-          onclick="closeModal('auditLogModal')">
-          닫기
-        </button>
+        <div id="auditLogModalBox" style="max-height: 300px; overflow-y: auto; font-size: 0.8rem"></div>
+        <button class="btn" style="background: #64748b; color: #fff; margin-top: 10px" onclick="closeModal('auditLogModal')">닫기</button>
       </div>
     </div>
 
@@ -833,12 +630,7 @@
       <div class="modal">
         <h3>🗑️ 휴지통</h3>
         <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
-        <button
-          class="btn"
-          style="background: #64748b; color: #fff; margin-top: 10px"
-          onclick="closeModal('trashModal')">
-          닫기
-        </button>
+        <button class="btn" style="background: #64748b; color: #fff; margin-top: 10px" onclick="closeModal('trashModal')">닫기</button>
       </div>
     </div>
 
@@ -853,37 +645,28 @@
       let quill = null;
       let activeView = "kanban";
       let currentTool = "pan";
-
+      
       let memosCache = {};
       let shapesCache = {};
+      let stickyCache = {};
       let selectedElementsList = [];
       let connectorsList = [];
       let connectorStartElem = null;
 
       let isGridSnapEnabled = true;
 
-      let canvasWidth =
-        parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
-      let canvasHeight =
-        parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
+      let canvasWidth = parseInt(localStorage.getItem("savedCanvasWidth")) || 3000;
+      let canvasHeight = parseInt(localStorage.getItem("savedCanvasHeight")) || 3000;
 
-      let pCanvas = null,
-        ctx = null;
-      let isDrawing = false,
-        lastX = 0,
-        lastY = 0;
-      let isPanning = false,
-        panStart = { x: 0, y: 0 },
-        canvasPos = { x: 0, y: 0 },
-        zoomLevel = 1.0;
+      let pCanvas = null, ctx = null;
+      let isDrawing = false, lastX = 0, lastY = 0;
+      let isPanning = false, panStart = { x: 0, y: 0 }, canvasPos = { x: 0, y: 0 }, zoomLevel = 1.0;
 
-      let isBoxSelecting = false,
-        boxStart = { x: 0, y: 0 };
+      let isBoxSelecting = false, boxStart = { x: 0, y: 0 };
 
-      // Undo / Redo 스택
+      // Undo / Redo 구현용 스택
       let undoStack = [];
       let redoStack = [];
-      let localHistoryStack = [];
 
       // 다크모드 초기화
       if (localStorage.getItem("theme_dark") === "true") {
@@ -892,10 +675,8 @@
 
       window.switchView = function (view) {
         activeView = view;
-        document.getElementById("kanbanView").style.display =
-          view === "kanban" ? "block" : "none";
-        document.getElementById("canvasView").style.display =
-          view === "canvas" ? "block" : "none";
+        document.getElementById("kanbanView").style.display = view === "kanban" ? "block" : "none";
+        document.getElementById("canvasView").style.display = view === "canvas" ? "block" : "none";
         if (view === "canvas") setTool("pan");
         if (currentBoardId) loadMemos();
       };
@@ -906,7 +687,7 @@
         localStorage.setItem("theme_dark", isDark ? "true" : "false");
       };
 
-      window.toggleGridSnap = function () {
+      window.toggleGridSnap = function() {
         isGridSnapEnabled = !isGridSnapEnabled;
         const btn = document.getElementById("btnGridToggle");
         const container = document.getElementById("canvasContainer");
@@ -923,17 +704,10 @@
         try {
           const res = await fetch("/api/logs");
           const logs = await res.json();
-          document.getElementById("auditLogModalBox").innerHTML = (
-            Array.isArray(logs) ? logs : []
-          )
-            .map(
-              (l) =>
-                `<div style="margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;"><b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})</div>`,
-            )
+          document.getElementById("auditLogModalBox").innerHTML = (Array.isArray(logs) ? logs : [])
+            .map((l) => `<div style="margin-bottom:6px; border-bottom:1px solid var(--border); padding-bottom:4px;"><b>[${new Date(l.created_at).toLocaleTimeString()}] ${l.username}</b>: ${l.action} (${l.details || ""})</div>`)
             .join("");
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         document.getElementById("auditLogModal").style.display = "flex";
       };
 
@@ -942,17 +716,10 @@
         try {
           const res = await fetch(`/api/trash/${currentBoardId}`);
           const trashMemos = await res.json();
-          document.getElementById("trashList").innerHTML = (
-            Array.isArray(trashMemos) ? trashMemos : []
-          )
-            .map(
-              (t) =>
-                `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;"><span>${t.title}</span><button class="btn btn-primary" style="padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button></div>`,
-            )
+          document.getElementById("trashList").innerHTML = (Array.isArray(trashMemos) ? trashMemos : [])
+            .map((t) => `<div style="display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; margin-bottom:6px;"><span>${t.title}</span><button class="btn btn-primary" style="padding:2px 6px;" onclick="restoreMemo('${t.id}')">복구</button></div>`)
             .join("");
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
         document.getElementById("trashModal").style.display = "flex";
       };
 
@@ -1009,9 +776,7 @@
 
       window.setTool = function (tool) {
         currentTool = tool;
-        document
-          .querySelectorAll(".tool-btn")
-          .forEach((btn) => btn.classList.remove("active"));
+        document.querySelectorAll(".tool-btn").forEach((btn) => btn.classList.remove("active"));
         const canvasView = document.getElementById("canvasView");
 
         if (tool === "pan") {
@@ -1035,10 +800,11 @@
         }
       };
 
-      // 도형 생성 버그 수정 및 서버 연동
-      window.addShape = async function (type) {
+      // 도형 생성
+      window.addShape = async function (type, shapeDataParam = null, isUndoAction = false) {
         if (!currentBoardId) return alert("게시판을 선택하세요.");
-        const shapeData = {
+        
+        const shapeData = shapeDataParam || {
           id: "shape-" + Date.now(),
           board_id: currentBoardId,
           type: type,
@@ -1057,8 +823,9 @@
         if (res.ok) {
           const created = await res.json();
           renderSingleShape(created);
-          pushUndoAction({ type: "create_shape", data: created });
-          pushHistoryState("도형 생성");
+          if (!isUndoAction) {
+            pushUndoAction({ type: "ADD", itemType: "shape", data: created });
+          }
         }
       };
 
@@ -1080,7 +847,7 @@
         else el.style.borderRadius = "8px";
 
         makeDraggable(el);
-
+        
         const clickHandler = (e) => {
           e.stopPropagation();
           if (currentTool === "delete") {
@@ -1092,29 +859,49 @@
         el.onclick = clickHandler;
       }
 
-      window.addStickyNote = function (color) {
-        const id = "sticky-" + Date.now();
-        const note = document.createElement("textarea");
-        note.className = "sticky-note";
-        note.id = id;
-        note.style.background = color;
-        note.style.left = `${200 - canvasPos.x}px`;
-        note.style.top = `${200 - canvasPos.y}px`;
+      window.addStickyNote = function (color, stickyDataParam = null, isUndoAction = false) {
+        const stickyData = stickyDataParam || {
+          id: "sticky-" + Date.now(),
+          color: color,
+          pos_x: Math.round(200 - canvasPos.x),
+          pos_y: Math.round(200 - canvasPos.y),
+          content: "",
+        };
+
+        renderSingleSticky(stickyData);
+
+        if (!isUndoAction) {
+          pushUndoAction({ type: "ADD", itemType: "sticky", data: stickyData });
+        }
+      };
+
+      function renderSingleSticky(data) {
+        stickyCache[data.id] = data;
+        let note = document.getElementById(data.id);
+        if (!note) {
+          note = document.createElement("textarea");
+          note.className = "sticky-note";
+          note.id = data.id;
+          document.getElementById("canvasContainer").appendChild(note);
+        }
+        note.style.background = data.color;
+        note.style.left = `${data.pos_x}px`;
+        note.style.top = `${data.pos_y}px`;
+        note.value = data.content || "";
         note.placeholder = "아이디어 작성...";
+
+        note.oninput = () => { stickyCache[data.id].content = note.value; };
 
         makeDraggable(note);
         note.onclick = (e) => {
           e.stopPropagation();
           if (currentTool === "delete") {
-            deleteElementById(id);
+            deleteElementById(data.id);
             return;
           }
-          handleElementClick(note, id);
+          handleElementClick(note, data.id);
         };
-        document.getElementById("canvasContainer").appendChild(note);
-        pushUndoAction({ type: "create_sticky", id: id });
-        pushHistoryState("스티키노트 추가");
-      };
+      }
 
       window.clearDrawings = function () {
         if (confirm("모든 그림을 지우시겠습니까?")) {
@@ -1124,9 +911,7 @@
       };
 
       window.autoLayoutMemos = function () {
-        const cards = Array.from(
-          document.querySelectorAll("#canvasContainer .canvas-card"),
-        );
+        const cards = Array.from(document.querySelectorAll("#canvasContainer .canvas-card"));
         cards.forEach((card, idx) => {
           const x = 100 + (idx % 4) * 280;
           const y = 100 + Math.floor(idx / 4) * 240;
@@ -1134,45 +919,46 @@
           card.style.top = `${y}px`;
           const id = card.dataset.id || card.id;
           if (memosCache[id]) {
-            socket.emit("memo:move", {
-              memoId: id,
-              boardId: currentBoardId,
-              pos_x: x,
-              pos_y: y,
-            });
+            socket.emit("memo:move", { memoId: id, boardId: currentBoardId, pos_x: x, pos_y: y });
           }
         });
         updateConnectors();
       };
 
       window.groupSelectedElements = function () {
-        if (selectedElementsList.length < 2)
-          return alert(
-            "2개 이상의 요소를 선택해주세요. (Shift+클릭 또는 드래그 선택)",
-          );
+        if (selectedElementsList.length < 2) return alert("2개 이상의 요소를 선택해주세요. (Shift+클릭 또는 드래그 선택)");
         const groupId = "group-" + Date.now();
-        selectedElementsList.forEach((el) =>
-          el.setAttribute("data-group-id", groupId),
-        );
+        selectedElementsList.forEach((el) => el.setAttribute("data-group-id", groupId));
         alert("선택한 요소들이 하나의 그룹으로 묶였습니다!");
       };
 
-      async function deleteElementById(id) {
+      async function deleteElementById(id, isUndoAction = false) {
         const el = document.getElementById(id);
+        let deletedItemData = null;
+        let deletedItemType = null;
+
         if (id.startsWith("shape-")) {
+          deletedItemType = "shape";
+          deletedItemData = shapesCache[id];
           await fetch(`/api/shapes/${id}`, { method: "DELETE" });
           if (el) el.remove();
           delete shapesCache[id];
         } else if (id.startsWith("sticky-")) {
+          deletedItemType = "sticky";
+          deletedItemData = stickyCache[id];
           if (el) el.remove();
+          delete stickyCache[id];
         } else if (memosCache[id]) {
-          deleteMemo(id);
+          deletedItemType = "memo";
+          deletedItemData = memosCache[id];
+          deleteMemo(id, true);
+        }
+        
+        if (!isUndoAction && deletedItemData) {
+          pushUndoAction({ type: "DELETE", itemType: deletedItemType, data: deletedItemData });
         }
 
-        // 해당 요소에 연결된 서티 커넥터 삭제
-        connectorsList = connectorsList.filter(
-          (c) => c.start.id !== id && c.end.id !== id,
-        );
+        connectorsList = connectorsList.filter(c => c.start.id !== id && c.end.id !== id);
         updateConnectors();
       }
 
@@ -1248,24 +1034,20 @@
         document.getElementById("editVideoUrl").value = memo.video_url || "";
         document.getElementById("editBgmTitle").value = memo.bgm_title || "";
         document.getElementById("editBgmUrl").value = memo.bgm_url || "";
-        quill.clipboard.dangerouslyPasteHTML(
-          memo.rich_content || memo.script || "",
-        );
+        quill.clipboard.dangerouslyPasteHTML(memo.rich_content || memo.script || "");
         document.getElementById("memoModal").style.display = "flex";
       };
 
-      window.deleteMemo = function (memoId) {
-        if (confirm("삭제하시겠습니까?")) {
+      window.deleteMemo = function (memoId, skipConfirm = false) {
+        if (skipConfirm || confirm("삭제하시겠습니까?")) {
           socket.emit("memo:delete", { memoId, boardId: currentBoardId });
         }
       };
 
       window.openReelsModal = function (title, script, bgm) {
         document.getElementById("reelsPreviewTitle").innerText = title;
-        document.getElementById("reelsPreviewScript").innerText =
-          script || "대본 없음";
-        document.getElementById("reelsPreviewBgm").innerText =
-          bgm || "기본 음원";
+        document.getElementById("reelsPreviewScript").innerText = script || "대본 없음";
+        document.getElementById("reelsPreviewBgm").innerText = bgm || "기본 음원";
         document.getElementById("reelsModal").style.display = "flex";
       };
 
@@ -1273,13 +1055,8 @@
         selectedMemoForComment = memoId;
         const res = await fetch(`/api/comments/${memoId}`);
         const comments = await res.json();
-        document.getElementById("commentList").innerHTML = (
-          Array.isArray(comments) ? comments : []
-        )
-          .map(
-            (c) =>
-              `<div style="font-size:0.8rem; margin-bottom:6px;"><b>${c.author}:</b> ${c.content}</div>`,
-          )
+        document.getElementById("commentList").innerHTML = (Array.isArray(comments) ? comments : [])
+          .map((c) => `<div style="font-size:0.8rem; margin-bottom:6px;"><b>${c.author}:</b> ${c.content}</div>`)
           .join("");
         document.getElementById("commentModal").style.display = "flex";
       };
@@ -1297,11 +1074,7 @@
       window.openMemoModalWithType = function (type) {
         document.getElementById("editMemoId").value = "";
         document.getElementById("editTitle").value =
-          type === "hook"
-            ? "⚡ 3초 후킹 노드"
-            : type === "story"
-              ? "📖 스토리 노드"
-              : "💡 아이디어 노드";
+          type === "hook" ? "⚡ 3초 후킹 노드" : type === "story" ? "📖 스토리 노드" : "💡 아이디어 노드";
         document.getElementById("editCategory").value = `#${type}`;
         quill.clipboard.dangerouslyPasteHTML("<p>[내용을 입력하세요]</p>");
         document.getElementById("memoModal").style.display = "flex";
@@ -1314,11 +1087,7 @@
             el.style.outline = "2px solid #3b82f6";
           } else {
             if (connectorStartElem !== el) {
-              const connObj = {
-                id: "conn-" + Date.now(),
-                start: connectorStartElem,
-                end: el,
-              };
+              const connObj = { id: "conn-" + Date.now(), start: connectorStartElem, end: el };
               connectorsList.push(connObj);
               updateConnectors();
             }
@@ -1331,17 +1100,13 @@
         activeSelectedElement = el;
         activeSelectedMemoId = id;
 
-        // 그룹원 연동 선택 처리
         const groupId = el.getAttribute("data-group-id");
         if (groupId) {
-          const groupMembers = Array.from(
-            document.querySelectorAll(`[data-group-id="${groupId}"]`),
-          );
+          const groupMembers = Array.from(document.querySelectorAll(`[data-group-id="${groupId}"]`));
           selectedElementsList = groupMembers;
         } else {
           if (window.event && window.event.shiftKey) {
-            if (!selectedElementsList.includes(el))
-              selectedElementsList.push(el);
+            if (!selectedElementsList.includes(el)) selectedElementsList.push(el);
           } else {
             selectedElementsList = [el];
           }
@@ -1350,18 +1115,14 @@
       }
 
       function highlightSelectedElements() {
-        document
-          .querySelectorAll(".card, .canvas-card, .sticky-note")
-          .forEach((el) => el.classList.remove("selected"));
+        document.querySelectorAll(".card, .canvas-card, .sticky-note").forEach((el) => el.classList.remove("selected"));
         selectedElementsList.forEach((el) => el.classList.add("selected"));
       }
 
       function getPointerPos(e) {
         const rect = pCanvas.getBoundingClientRect();
-        const clientX =
-          e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
-        const clientY =
-          e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
+        const clientX = e.touches && e.touches.length > 0 ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches && e.touches.length > 0 ? e.touches[0].clientY : e.clientY;
         return {
           x: (clientX - rect.left) / zoomLevel,
           y: (clientY - rect.top) / zoomLevel,
@@ -1418,9 +1179,7 @@
           lastY = pos.y;
         };
 
-        const stopDraw = () => {
-          isDrawing = false;
-        };
+        const stopDraw = () => { isDrawing = false; };
 
         pCanvas.addEventListener("mousedown", startDraw);
         pCanvas.addEventListener("mousemove", moveDraw);
@@ -1433,18 +1192,14 @@
         const canvasView = document.getElementById("canvasView");
         const container = document.getElementById("canvasContainer");
 
-        canvasView.addEventListener(
-          "wheel",
-          (e) => {
-            if (e.ctrlKey) {
-              e.preventDefault();
-              zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
-              zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
-              updateCanvasTransform();
-            }
-          },
-          { passive: false },
-        );
+        canvasView.addEventListener("wheel", (e) => {
+          if (e.ctrlKey) {
+            e.preventDefault();
+            zoomLevel += e.deltaY < 0 ? 0.05 : -0.05;
+            zoomLevel = Math.min(Math.max(0.3, zoomLevel), 2.5);
+            updateCanvasTransform();
+          }
+        }, { passive: false });
 
         canvasView.addEventListener("mousemove", (e) => {
           if (currentBoardId && currentUser) {
@@ -1457,10 +1212,8 @@
           }
 
           if (isBoxSelecting) {
-            const currentX =
-              (e.clientX - container.getBoundingClientRect().left) / zoomLevel;
-            const currentY =
-              (e.clientY - container.getBoundingClientRect().top) / zoomLevel;
+            const currentX = (e.clientX - container.getBoundingClientRect().left) / zoomLevel;
+            const currentY = (e.clientY - container.getBoundingClientRect().top) / zoomLevel;
             const box = document.getElementById("dragSelectBox");
             const left = Math.min(boxStart.x, currentX);
             const top = Math.min(boxStart.y, currentY);
@@ -1473,27 +1226,17 @@
             box.style.height = `${height}px`;
 
             selectedElementsList = [];
-            document
-              .querySelectorAll(
-                "#canvasContainer .canvas-card, #canvasContainer .sticky-note",
-              )
-              .forEach((el) => {
-                const ex = parseFloat(el.style.left) || 0;
-                const ey = parseFloat(el.style.top) || 0;
-                if (
-                  ex >= left &&
-                  ex <= left + width &&
-                  ey >= top &&
-                  ey <= top + height
-                ) {
-                  selectedElementsList.push(el);
-                }
-              });
+            document.querySelectorAll("#canvasContainer .canvas-card, #canvasContainer .sticky-note").forEach((el) => {
+              const ex = parseFloat(el.style.left) || 0;
+              const ey = parseFloat(el.style.top) || 0;
+              if (ex >= left && ex <= left + width && ey >= top && ey <= top + height) {
+                selectedElementsList.push(el);
+              }
+            });
             highlightSelectedElements();
           }
         });
 
-        // 캔버스 드래그 및 마우스 다운 바인딩
         const onContainerPointerDown = (e) => {
           if (e.target.closest(".canvas-card, .sticky-note")) return;
 
@@ -1521,9 +1264,7 @@
         };
 
         canvasView.addEventListener("mousedown", onContainerPointerDown);
-        canvasView.addEventListener("touchstart", onContainerPointerDown, {
-          passive: false,
-        });
+        canvasView.addEventListener("touchstart", onContainerPointerDown, { passive: false });
 
         const onContainerPointerMove = (e) => {
           if (isPanning) {
@@ -1536,9 +1277,7 @@
         };
 
         window.addEventListener("mousemove", onContainerPointerMove);
-        window.addEventListener("touchmove", onContainerPointerMove, {
-          passive: false,
-        });
+        window.addEventListener("touchmove", onContainerPointerMove, { passive: false });
 
         const onContainerPointerUp = () => {
           if (isPanning) {
@@ -1572,17 +1311,11 @@
         });
 
         window.addEventListener("keydown", (e) => {
-          if (
-            ["input", "textarea"].includes(
-              document.activeElement.tagName.toLowerCase(),
-            )
-          )
-            return;
+          if (["input", "textarea"].includes(document.activeElement.tagName.toLowerCase())) return;
           if (e.key.toLowerCase() === "v") setTool("select");
           if (e.key.toLowerCase() === "h") setTool("pan");
           if (e.key.toLowerCase() === "p") setTool("pen");
-          if (e.key === "Delete" || e.key === "Backspace")
-            contextAction("delete");
+          if (e.key === "Delete" || e.key === "Backspace") contextAction("delete");
           if (e.ctrlKey && e.key.toLowerCase() === "z") undo();
           if (e.ctrlKey && e.key.toLowerCase() === "y") redo();
         });
@@ -1598,8 +1331,7 @@
 
       function updateMinimap() {
         const viewport = document.getElementById("minimapViewport");
-        const ratioX = 160 / canvasWidth,
-          ratioY = 120 / canvasHeight;
+        const ratioX = 160 / canvasWidth, ratioY = 120 / canvasHeight;
         viewport.style.width = `${(window.innerWidth / zoomLevel) * ratioX}px`;
         viewport.style.height = `${(window.innerHeight / zoomLevel) * ratioY}px`;
         viewport.style.left = `${Math.max(0, -canvasPos.x * ratioX)}px`;
@@ -1607,18 +1339,17 @@
       }
 
       function makeDraggable(element) {
-        let isDragging = false,
-          offsetLeft = 0,
-          offsetTop = 0;
+        let isDragging = false, offsetLeft = 0, offsetTop = 0;
+        let startPos = { x: 0, y: 0 };
 
         const startDrag = (e) => {
-          if (currentTool !== "select" || element.classList.contains("locked"))
-            return;
+          if (currentTool !== "select" || element.classList.contains("locked")) return;
           isDragging = true;
           const clientX = e.touches ? e.touches[0].clientX : e.clientX;
           const clientY = e.touches ? e.touches[0].clientY : e.clientY;
           offsetLeft = clientX / zoomLevel - element.offsetLeft;
           offsetTop = clientY / zoomLevel - element.offsetTop;
+          startPos = { x: parseInt(element.style.left) || 0, y: parseInt(element.style.top) || 0 };
         };
 
         const moveDrag = (e) => {
@@ -1653,21 +1384,35 @@
           if (isDragging) {
             isDragging = false;
             const id = element.dataset.id || element.id;
+            const endPos = { x: parseInt(element.style.left), y: parseInt(element.style.top) };
+
+            if (startPos.x !== endPos.x || startPos.y !== endPos.y) {
+              pushUndoAction({
+                type: "MOVE",
+                id: id,
+                from: startPos,
+                to: endPos
+              });
+            }
+
             if (memosCache[id]) {
               socket.emit("memo:move", {
                 memoId: id,
                 boardId: currentBoardId,
-                pos_x: parseInt(element.style.left),
-                pos_y: parseInt(element.style.top),
+                pos_x: endPos.x,
+                pos_y: endPos.y,
               });
             } else if (shapesCache[id]) {
-              shapesCache[id].pos_x = parseInt(element.style.left);
-              shapesCache[id].pos_y = parseInt(element.style.top);
+              shapesCache[id].pos_x = endPos.x;
+              shapesCache[id].pos_y = endPos.y;
               fetch("/api/shapes", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(shapesCache[id]),
               });
+            } else if (stickyCache[id]) {
+              stickyCache[id].pos_x = endPos.x;
+              stickyCache[id].pos_y = endPos.y;
             }
           }
         };
@@ -1686,17 +1431,12 @@
         svg.innerHTML = "";
         connectorsList.forEach((conn, index) => {
           if (!conn.start || !conn.end) return;
-          const x1 =
-            parseFloat(conn.start.style.left) + conn.start.offsetWidth / 2;
-          const y1 =
-            parseFloat(conn.start.style.top) + conn.start.offsetHeight / 2;
+          const x1 = parseFloat(conn.start.style.left) + conn.start.offsetWidth / 2;
+          const y1 = parseFloat(conn.start.style.top) + conn.start.offsetHeight / 2;
           const x2 = parseFloat(conn.end.style.left) + conn.end.offsetWidth / 2;
           const y2 = parseFloat(conn.end.style.top) + conn.end.offsetHeight / 2;
 
-          const line = document.createElementNS(
-            "http://www.w3.org/2000/svg",
-            "line",
-          );
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
           line.setAttribute("x1", x1);
           line.setAttribute("y1", y1);
           line.setAttribute("x2", x2);
@@ -1705,7 +1445,6 @@
           line.setAttribute("stroke-width", "3");
           line.setAttribute("stroke-dasharray", "5,5");
 
-          // 클릭 시 연결선 지우기 기능 제공
           line.onclick = (e) => {
             e.stopPropagation();
             if (confirm("이 연결선을 삭제하시겠습니까?")) {
@@ -1729,47 +1468,77 @@
         updateMinimap();
       }
 
-      // Undo / Redo 기능 구현
+      // 💡 정교화된 Undo / Redo 스택 및 상태 업데이트 로직
       function pushUndoAction(action) {
         undoStack.push(action);
-        redoStack = [];
+        redoStack = []; // 새로운 동작 발생 시 redo 초기화
+        updateSliderUI();
       }
 
-      window.undo = function () {
+      function updateSliderUI() {
+        const slider = document.getElementById("historySlider");
+        slider.max = undoStack.length;
+        slider.value = undoStack.length;
+      }
+
+      window.undo = async function() {
         if (!undoStack.length) return;
         const act = undoStack.pop();
         redoStack.push(act);
+        updateSliderUI();
 
-        if (act.type === "create_shape") {
-          deleteElementById(act.data.id);
-        } else if (act.type === "create_sticky") {
+        if (act.type === "ADD") {
+          // 추가했던 객체를 화면에서 다시 제거
+          deleteElementById(act.data.id, true);
+        } else if (act.type === "DELETE") {
+          // 삭제했던 객체 복원
+          if (act.itemType === "shape") {
+            addShape(act.data.type, act.data, true);
+          } else if (act.itemType === "sticky") {
+            addStickyNote(act.data.color, act.data, true);
+          } else if (act.itemType === "memo") {
+            await restoreMemo(act.data.id);
+          }
+        } else if (act.type === "MOVE") {
+          // 이전을 이전 위치로 대입
           const el = document.getElementById(act.id);
-          if (el) el.remove();
+          if (el) {
+            el.style.left = `${act.from.x}px`;
+            el.style.top = `${act.from.y}px`;
+            updateConnectors();
+          }
         }
       };
 
-      window.redo = function () {
+      window.redo = async function() {
         if (!redoStack.length) return;
         const act = redoStack.pop();
         undoStack.push(act);
+        updateSliderUI();
 
-        if (act.type === "create_shape") {
-          renderSingleShape(act.data);
+        if (act.type === "ADD") {
+          if (act.itemType === "shape") {
+            addShape(act.data.type, act.data, true);
+          } else if (act.itemType === "sticky") {
+            addStickyNote(act.data.color, act.data, true);
+          }
+        } else if (act.type === "DELETE") {
+          deleteElementById(act.data.id, true);
+        } else if (act.type === "MOVE") {
+          const el = document.getElementById(act.id);
+          if (el) {
+            el.style.left = `${act.to.x}px`;
+            el.style.top = `${act.to.y}px`;
+            updateConnectors();
+          }
         }
       };
 
-      function pushHistoryState(action) {
-        localHistoryStack.push({
-          time: new Date().toLocaleTimeString(),
-          action,
-        });
-        const slider = document.getElementById("historySlider");
-        slider.max = localHistoryStack.length - 1;
-        slider.value = localHistoryStack.length - 1;
-      }
-
       window.onHistorySliderChange = function (val) {
-        console.log("히스토리 복원 지점:", localHistoryStack[val]);
+        // 슬라이더를 뒤로 이동시킬 때 Undo 실행
+        while (undoStack.length > val) {
+          undo();
+        }
       };
 
       async function init() {
@@ -1782,9 +1551,7 @@
             switchView("kanban");
             loadBoards();
           }
-        } catch (e) {
-          console.error(e);
-        }
+        } catch (e) { console.error(e); }
       }
 
       async function loadBoards() {
@@ -1796,8 +1563,7 @@
         if (Array.isArray(boards)) {
           boards.forEach((board, idx) => {
             const li = document.createElement("li");
-            li.style.cssText =
-              "display:flex; justify-content:space-between; align-items:center; padding:6px 0;";
+            li.style.cssText = "display:flex; justify-content:space-between; align-items:center; padding:6px 0;";
             li.innerHTML = `<span style="cursor:pointer;" onclick="selectBoard('${board.id}', '${board.name}')">${board.name}</span>`;
             if ((idx === 0 && !currentBoardId) || currentBoardId === board.id) {
               selectBoard(board.id, board.name);
@@ -1819,9 +1585,7 @@
         if (!currentBoardId) return;
         const res = await fetch(`/api/shapes/${currentBoardId}`);
         const shapes = await res.json();
-        (Array.isArray(shapes) ? shapes : []).forEach((shape) =>
-          renderSingleShape(shape),
-        );
+        (Array.isArray(shapes) ? shapes : []).forEach((shape) => renderSingleShape(shape));
       }
 
       async function loadMemos() {
@@ -1840,9 +1604,7 @@
 
         memos.forEach((memo) => {
           memosCache[memo.id] = memo;
-          const colEl =
-            document.getElementById(`col-${memo.status}`) ||
-            document.getElementById("col-아이디어");
+          const colEl = document.getElementById(`col-${memo.status}`) || document.getElementById("col-아이디어");
           const card = document.createElement("div");
           card.className = `card ${memo.is_pinned ? "pinned" : ""}`;
           card.dataset.id = memo.id;
@@ -1865,9 +1627,7 @@
 
       function renderCanvas(memos) {
         const container = document.getElementById("canvasContainer");
-        container
-          .querySelectorAll(".canvas-card:not(.shape-element)")
-          .forEach((c) => c.remove());
+        container.querySelectorAll(".canvas-card:not(.shape-element)").forEach((c) => c.remove());
 
         memos.forEach((memo, index) => {
           memosCache[memo.id] = memo;
@@ -1901,8 +1661,7 @@
       }
 
       socket.on("presence:update", (users) => {
-        document.getElementById("onlineCount").innerText =
-          `접속자: ${users.length}명`;
+        document.getElementById("onlineCount").innerText = `접속자: ${users.length}명`;
       });
 
       socket.on("cursor:moved", ({ socketId, name, x, y }) => {
@@ -1939,7 +1698,7 @@
           updateConnectors();
         }
       });
-
+      
       socket.on("drawing:stroke", (s) => {
         if (!ctx) return;
         ctx.beginPath();
@@ -1956,10 +1715,7 @@
         ctx.lineCap = "round";
         ctx.stroke();
       });
-      socket.on(
-        "drawing:cleared",
-        () => ctx && ctx.clearRect(0, 0, pCanvas.width, pCanvas.height),
-      );
+      socket.on("drawing:cleared", () => ctx && ctx.clearRect(0, 0, pCanvas.width, pCanvas.height));
     </script>
   </body>
 </html>
