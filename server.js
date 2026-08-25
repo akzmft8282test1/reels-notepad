@@ -11,9 +11,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Supabase 클라이언트 생성
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error("⚠️ SUPABASE 환경변수가 설정되지 않았습니다!");
+}
+
 const supabase = createClient(
-  process.env.SUPABASE_URL || "https://placeholder.supabase.co",
-  process.env.SUPABASE_ANON_KEY || "placeholder"
+  supabaseUrl || "https://placeholder.supabase.co",
+  supabaseKey || "placeholder"
 );
 
 app.use(express.json());
@@ -42,12 +50,11 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// === 로그인 API (401 예외 및 안전성 완벽 보완) ===
+// === 로그인 API (DB 에러 방지 처리 완료) ===
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // 1. 필수 값 검증
     if (!username || !password) {
       return res
         .status(400)
@@ -56,25 +63,30 @@ app.post("/api/login", async (req, res) => {
 
     const cleanUsername = username.trim();
 
-    // 2. Supabase 유저 조회
-    const { data: user, error } = await supabase
+    // maybeSingle() 대신 안전하게 select().eq() 사용 (중복 데이터 시 500 에러 방지)
+    const { data: users, error } = await supabase
       .from("allowed_users")
       .select("*")
-      .eq("username", cleanUsername)
-      .maybeSingle(); // single() 대신 maybeSingle()로 에러 폭주 방지
+      .eq("username", cleanUsername);
 
     if (error) {
-      console.error("Supabase User Query Error:", error);
-      return res.status(500).json({ success: false, message: "DB 조회 중 오류가 발생했습니다." });
+      console.error("❌ Supabase DB Query Error:", error.message, error.details, error.hint);
+      return res.status(500).json({ 
+        success: false, 
+        message: `DB 조회 오류가 발생했습니다: ${error.message}` 
+      });
     }
 
-    if (!user) {
+    if (!users || users.length === 0) {
       return res
         .status(401)
         .json({ success: false, message: "등록되지 않은 계정입니다." });
     }
 
-    // 3. 비밀번호 비교 (bcrypt 해시 및 평문 공존 지원)
+    // 첫 번째 일치하는 유저 선택
+    const user = users[0];
+
+    // 비밀번호 검증 (bcrypt 해시 및 평문 공존 지원)
     let isValidPassword = false;
     if (user.password && user.password.startsWith("$2")) {
       isValidPassword = await bcrypt.compare(password, user.password);
@@ -88,7 +100,7 @@ app.post("/api/login", async (req, res) => {
         .json({ success: false, message: "비밀번호가 올바르지 않습니다." });
     }
 
-    // 4. 세션 저장 및 응답
+    // 세션 저장
     req.session.user = {
       id: user.id,
       username: user.username,
@@ -107,7 +119,7 @@ app.post("/api/login", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Login Server Catch Error:", err);
+    console.error("Login Internal Catch Error:", err);
     return res.status(500).json({ success: false, message: "서버 내부 오류가 발생했습니다." });
   }
 });
@@ -120,7 +132,7 @@ app.get("/api/me", (req, res) => {
 });
 
 app.post("/api/logout", (req, res) => {
-  if (req.session.user) {
+  if (req.session?.user) {
     logAction(req.session.user.username, "LOGOUT", "로그아웃");
   }
   req.session.destroy();
