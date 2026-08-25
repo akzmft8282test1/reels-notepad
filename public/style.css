@@ -1,0 +1,456 @@
+:root {
+  --primary: #e1306c;
+  --primary-hover: #c12a5b;
+  --bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --border: #e2e8f0;
+  --canvas-bg: #f8fafc;
+  --dot-color: rgba(203, 213, 225, 0.9);
+  --grid-line-color: rgba(203, 213, 225, 0.4);
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+body.dark-mode {
+  --bg: #0f172a;
+  --card-bg: #1e293b;
+  --text: #f8fafc;
+  --border: #334155;
+  --canvas-bg: #090d16;
+  --dot-color: rgba(51, 65, 85, 0.9);
+  --grid-line-color: rgba(51, 65, 85, 0.4);
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+  touch-action: manipulation;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  user-select: none;
+}
+
+header {
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 1.25rem;
+  color: var(--primary);
+  letter-spacing: -0.5px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.online-users {
+  font-size: 0.85rem;
+  background: rgba(225, 48, 108, 0.1);
+  color: var(--primary);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+}
+.btn-blue {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+}
+.btn-green {
+  background: #10b981;
+  color: #fff;
+  border: none;
+}
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+}
+
+.kanban-container {
+  display: flex;
+  gap: 15px;
+  overflow-x: auto;
+  padding-bottom: 20px;
+  margin-top: 20px;
+}
+.kanban-col {
+  flex: 1;
+  min-width: 280px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+}
+.kanban-col-title {
+  font-weight: 700;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 14px;
+  margin-bottom: 12px;
+  position: relative;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: box-shadow 0.2s, border 0.2s;
+}
+.card.selected,
+.canvas-card.selected,
+.sticky-note.selected {
+  border: 2px solid var(--primary) !important;
+  box-shadow: 0 0 12px rgba(225, 48, 108, 0.4);
+}
+.card.pinned {
+  border-left: 4px solid var(--primary);
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  border-radius: 12px;
+  background: rgba(225, 48, 108, 0.1);
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.script-box {
+  background: rgba(0, 0, 0, 0.03);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  max-height: 120px;
+  overflow-y: auto;
+}
+
+#canvasView {
+  display: none;
+  width: 100vw;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+  position: relative;
+  touch-action: none;
+}
+#canvasToolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 100;
+  display: flex;
+  gap: 4px;
+  background: var(--card-bg);
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  align-items: center;
+  max-width: calc(100vw - 24px);
+  overflow-x: auto;
+}
+#canvasToolbar .btn {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+#canvasContainer {
+  width: 3000px;
+  height: 3000px;
+  background-color: var(--canvas-bg);
+  background-image: radial-gradient(var(--dot-color) 1.5px, transparent 1.5px);
+  background-size: 24px 24px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+#canvasContainer.grid-snapping {
+  background-image: linear-gradient(to right, var(--grid-line-color) 1px, transparent 1px),
+                    linear-gradient(to bottom, var(--grid-line-color) 1px, transparent 1px) !important;
+  background-size: 20px 20px, 20px 20px !important;
+}
+
+#paintCanvas,
+#svgConnectorLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+#paintCanvas {
+  z-index: 5;
+  pointer-events: none;
+}
+#paintCanvas.active-draw {
+  pointer-events: auto;
+}
+#svgConnectorLayer {
+  z-index: 2;
+  pointer-events: none;
+}
+#svgConnectorLayer line {
+  cursor: pointer;
+  pointer-events: visibleStroke;
+}
+#svgConnectorLayer line:hover {
+  stroke: #ef4444;
+  stroke-width: 5;
+}
+
+.canvas-card {
+  position: absolute;
+  min-width: 200px;
+  background: var(--card-bg);
+  color: var(--text);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  padding: 14px;
+  box-shadow: var(--shadow);
+  z-index: 10;
+  resize: both;
+  overflow: auto;
+  touch-action: none;
+}
+.canvas-card.grouped {
+  outline: 2px dashed #3b82f6;
+}
+.canvas-card.locked {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.remote-cursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  padding: 3px 8px;
+  border-radius: 12px;
+  color: white;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  transition: left 0.1s linear, top 0.1s linear;
+}
+.remote-cursor::before {
+  content: "↖";
+  font-size: 1rem;
+}
+
+.sticky-note {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 12;
+  font-weight: 600;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  resize: both;
+  outline: none;
+  touch-action: none;
+}
+
+.sticky-note textarea {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font-weight: bold;
+}
+
+#dragSelectBox {
+  display: none;
+  position: absolute;
+  border: 1px dashed var(--primary);
+  background: rgba(225, 48, 108, 0.15);
+  z-index: 999;
+  pointer-events: none;
+}
+
+#minimap {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 160px;
+  height: 120px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  z-index: 500;
+  overflow: hidden;
+}
+#minimapViewport {
+  position: absolute;
+  border: 1.5px solid var(--primary);
+  background: rgba(225, 48, 108, 0.25);
+}
+
+#contextMenu {
+  display: none;
+  position: fixed;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  z-index: 9999;
+  min-width: 160px;
+  padding: 6px 0;
+}
+#contextMenu div {
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+}
+#contextMenu div:hover {
+  background: var(--primary);
+  color: #fff;
+}
+
+.tool-btn.active {
+  background: var(--primary) !important;
+  color: white !important;
+  font-weight: bold;
+}
+
+.modal-bg {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 2000;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--card-bg);
+  color: var(--text);
+  padding: 20px;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow);
+}
+
+.reels-phone-frame {
+  width: 270px;
+  height: 480px;
+  background: #000;
+  color: #fff;
+  border-radius: 24px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin: 0 auto;
+  border: 4px solid #333;
+}
+
+.sidebar {
+  position: fixed;
+  right: -300px;
+  top: 0;
+  width: 280px;
+  height: 100%;
+  background: var(--card-bg);
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.1);
+  transition: 0.3s ease;
+  z-index: 500;
+  padding: 20px;
+}
+.sidebar.open {
+  right: 0;
+}
+
+input,
+textarea,
+select,
+button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+#timelineBar {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 12px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
