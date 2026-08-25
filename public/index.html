@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>🎬 릴스 대회 아이디어 & 피그마 스튜디오 Pro</title>
+    <script src="/socket.io/socket.io.js"></script>
+
+    <!-- Quill.js 에디터 -->
+    <link
+      href="https://cdn.quilljs.com/1.3.6/quill.snow.css"
+      rel="stylesheet" />
+    <script src="https://cdn.quilljs.com/1.3.6/quill.min.js"></script>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <div class="logo">🎬 릴스 스튜디오 Pro</div>
+      <div class="header-right">
+        <button class="btn" onclick="switchView('kanban')">📋 칸반</button>
+        <button class="btn" onclick="switchView('canvas')">🎨 캔버스</button>
+        <button class="btn" onclick="toggleDarkMode()">🌙/☀️</button>
+        <button class="btn" onclick="openAuditLogsModal()">📜 활동로그</button>
+        <button class="btn" onclick="toggleTrashModal()">🗑️ 휴지통</button>
+        <div id="onlineCount" class="online-users">접속자: 0명</div>
+        <button
+          class="btn"
+          style="border: none; font-size: 1.2rem"
+          onclick="toggleSidebar()">
+          ☰
+        </button>
+      </div>
+    </header>
+
+    <div id="sidebar" class="sidebar">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h3>📌 게시판 목록</h3>
+        <span style="cursor: pointer" onclick="toggleSidebar()">✕</span>
+      </div>
+      <ul id="boardList" style="list-style: none; padding: 0"></ul>
+      <hr style="border-color: var(--border)" />
+      <h4>+ 새 게시판</h4>
+      <input type="text" id="newBoardName" placeholder="게시판 이름" />
+      <button
+        class="btn btn-primary"
+        style="margin-top: 8px"
+        onclick="createBoard()">
+        게시판 생성
+      </button>
+      <button
+        class="btn btn-danger"
+        style="margin-top: 8px"
+        onclick="exportTXT()">
+        📄 대본 TXT 내보내기
+      </button>
+      <button
+        class="btn"
+        style="margin-top: 8px; background: #64748b; color: #fff"
+        onclick="logout()">
+        로그아웃
+      </button>
+    </div>
+
+    <!-- 로그인 -->
+    <div
+      id="loginView"
+      style="max-width: 360px; margin: 80px auto; text-align: center">
+      <h2>🔐 로그인</h2>
+      <form onsubmit="login(event)">
+        <input type="text" id="username" placeholder="아이디" required />
+        <input type="password" id="password" placeholder="비밀번호" required />
+        <button type="submit" class="btn btn-primary" style="margin-top: 12px">
+          로그인
+        </button>
+      </form>
+    </div>
+
+    <!-- 1. 칸반 보드 -->
+    <div
+      id="kanbanView"
+      style="
+        max-width: 1200px;
+        margin: 20px auto;
+        padding: 0 15px;
+        display: none;
+      ">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        ">
+        <h2 id="currentBoardTitle">기본 게시판</h2>
+        <div style="display: flex; gap: 6px">
+          <button
+            class="btn btn-primary"
+            onclick="openMemoModalWithType('hook')">
+            ⚡ 3초 후킹
+          </button>
+          <button class="btn btn-blue" onclick="openMemoModalWithType('story')">
+            📖 스토리
+          </button>
+          <button
+            class="btn btn-green"
+            onclick="openMemoModalWithType('custom')">
+            + 자유 노드
+          </button>
+        </div>
+      </div>
+
+      <div class="kanban-container">
+        <div class="kanban-col">
+          <div class="kanban-col-title">💡 아이디어</div>
+          <div id="col-아이디어"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-title">✍️ 대본작성</div>
+          <div id="col-대본작성"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-title">🎥 촬영예정</div>
+          <div id="col-촬영예정"></div>
+        </div>
+        <div class="kanban-col">
+          <div class="kanban-col-title">✅ 완료</div>
+          <div id="col-완료"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. 무한 캔버스 -->
+    <div id="canvasView">
+      <div id="canvasToolbar">
+        <button
+          id="btnPan"
+          class="btn tool-btn active"
+          onclick="setTool('pan')">
+          🖐️ 이동(H)
+        </button>
+        <button id="btnSelect" class="btn tool-btn" onclick="setTool('select')">
+          ↖️ 선택(V)
+        </button>
+        <button id="btnPen" class="btn tool-btn" onclick="setTool('pen')">
+          ✏️ 펜(P)
+        </button>
+        <button id="btnEraser" class="btn tool-btn" onclick="setTool('eraser')">
+          🧹 지우개
+        </button>
+        <button
+          id="btnConnector"
+          class="btn tool-btn"
+          onclick="setTool('connector')">
+          🔗 연결선
+        </button>
+        <button
+          id="btnDeleteTool"
+          class="btn tool-btn btn-danger"
+          onclick="setTool('delete')">
+          🗑️ 삭제도구
+        </button>
+
+        <button
+          class="btn"
+          style="background: #f59e0b; color: #fff"
+          onclick="addShape('rect')">
+          🟦 사각형
+        </button>
+        <button
+          class="btn"
+          style="background: #8b5cf6; color: #fff"
+          onclick="addShape('circle')">
+          🟡 원형
+        </button>
+        <button
+          class="btn"
+          style="background: #eab308; color: #000"
+          onclick="addStickyNote('#fef08a')">
+          🟨 메모
+        </button>
+
+        <button id="btnGridSnap" class="btn" onclick="toggleGridSnap()">
+          🧲 그리드스냅: ON
+        </button>
+        <button class="btn btn-blue" onclick="expandCanvas1000()">
+          📐 +1000px 확장
+        </button>
+
+        <input
+          type="color"
+          id="penColor"
+          value="#e1306c"
+          style="
+            width: 26px;
+            height: 26px;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            background: none;
+            flex-shrink: 0;
+          " />
+
+        <button class="btn btn-blue" onclick="autoLayoutElements()">
+          📐 자동정렬
+        </button>
+        <button class="btn btn-primary" onclick="groupSelectedElements()">
+          📦 그룹화
+        </button>
+        <button class="btn btn-danger" onclick="clearDrawings()">
+          그림 지우기
+        </button>
+        <span id="canvasSizeInfo" style="font-size:0.75rem; color:#888; margin-left:4px;"></span>
+      </div>
+
+      <div id="canvasContainer">
+        <canvas id="paintCanvas" width="3000" height="3000"></canvas>
+        <svg id="svgConnectorLayer" width="3000" height="3000"></svg>
+        <div id="dragSelectBox"></div>
+      </div>
+
+      <div id="minimap"><div id="minimapViewport"></div></div>
+
+      <div id="timelineBar">
+        <button class="btn" style="padding: 4px 8px" onclick="undo()">
+          ↩️ Undo
+        </button>
+        <button class="btn" style="padding: 4px 8px" onclick="redo()">
+          ↪️ Redo
+        </button>
+        <span style="font-size: 0.8rem; font-weight: bold; margin-left: 5px"
+          >⏱️ 히스토리:</span
+        >
+        <input
+          type="range"
+          id="historySlider"
+          min="0"
+          max="0"
+          value="0"
+          style="width: 120px"
+          oninput="onHistorySliderChange(this.value)" />
+      </div>
+    </div>
+
+    <!-- 컨텍스트 메뉴 -->
+    <div id="contextMenu">
+      <div onclick="contextAction('copy')">
+        <span>📋 복사</span><small>Ctrl+C</small>
+      </div>
+      <div onclick="contextAction('duplicate')">
+        <span>👯 복제</span><small>Ctrl+D</small>
+      </div>
+      <div onclick="contextAction('lock')"><span>🔒 잠금 토글</span></div>
+      <div onclick="contextAction('delete')" style="color: #ef4444">
+        <span>🗑️ 삭제</span><small>Del</small>
+      </div>
+    </div>
+
+    <!-- 메모 작성/수정 모달 -->
+    <div id="memoModal" class="modal-bg">
+      <div class="modal">
+        <h3>📝 메모/대본 작성</h3>
+        <input type="hidden" id="editMemoId" />
+        <label>제목</label><input type="text" id="editTitle" />
+        <label>카테고리</label
+        ><input type="text" id="editCategory" placeholder="#태그" />
+        <label>상태</label>
+        <select id="editStatus">
+          <option value="아이디어">💡 아이디어</option>
+          <option value="대본작성">✍️ 대본작성</option>
+          <option value="촬영예정">🎥 촬영예정</option>
+          <option value="완료">✅ 완료</option>
+        </select>
+        <label>영상 URL</label
+        ><input type="text" id="editVideoUrl" placeholder="https://..." />
+        <label>BGM 음원명 / 링크</label>
+        <div style="display: flex; gap: 5px">
+          <input type="text" id="editBgmTitle" placeholder="음원명" />
+          <input type="text" id="editBgmUrl" placeholder="URL" />
+        </div>
+        <label>대본</label>
+        <div
+          id="quillEditor"
+          style="
+            height: 140px;
+            background: #fff;
+            color: #000;
+            margin-top: 6px;
+          "></div>
+        <div style="display: flex; gap: 10px; margin-top: 15px">
+          <button class="btn btn-primary" onclick="saveMemoModal()">
+            저장
+          </button>
+          <button
+            class="btn"
+            style="background: #64748b; color: #fff"
+            onclick="closeModal('memoModal')">
+            취소
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 댓글 모달 -->
+    <div id="commentModal" class="modal-bg">
+      <div class="modal">
+        <h3>💬 댓글</h3>
+        <div
+          id="commentList"
+          style="
+            max-height: 200px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            padding: 8px;
+            border-radius: 6px;
+          "></div>
+        <textarea
+          id="newCommentText"
+          placeholder="댓글 입력..."
+          rows="2"></textarea>
+        <button
+          class="btn btn-primary"
+          style="margin-top: 6px"
+          onclick="submitComment()">
+          작성
+        </button>
+        <button
+          class="btn"
+          style="margin-top: 5px; background: #64748b; color: #fff"
+          onclick="closeModal('commentModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 릴스 미리보기 모달 -->
+    <div id="reelsModal" class="modal-bg">
+      <div class="modal" style="background: transparent; box-shadow: none">
+        <div class="reels-phone-frame">
+          <div
+            style="
+              display: flex;
+              justify-content: space-between;
+              font-size: 0.8rem;
+            ">
+            <span id="reelsPreviewTitle">릴스 미리보기</span>
+            <span style="cursor: pointer" onclick="closeModal('reelsModal')"
+              >✕</span
+            >
+          </div>
+          <div
+            id="reelsPreviewScript"
+            style="
+              text-align: center;
+              padding: 20px;
+              font-size: 1rem;
+              font-weight: bold;
+              background: rgba(0, 0, 0, 0.6);
+              border-radius: 10px;
+            "></div>
+          <div style="font-size: 0.8rem">
+            🎵 <span id="reelsPreviewBgm">음원 정보 없음</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 활동 로그 모달 -->
+    <div id="auditLogModal" class="modal-bg">
+      <div class="modal">
+        <h3>📜 활동 로그</h3>
+        <div
+          id="auditLogModalBox"
+          style="max-height: 300px; overflow-y: auto; font-size: 0.8rem"></div>
+        <button
+          class="btn"
+          style="background: #64748b; color: #fff; margin-top: 10px"
+          onclick="closeModal('auditLogModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <!-- 휴지통 모달 -->
+    <div id="trashModal" class="modal-bg">
+      <div class="modal">
+        <h3>🗑️ 휴지통</h3>
+        <div id="trashList" style="max-height: 250px; overflow-y: auto"></div>
+        <button
+          class="btn"
+          style="background: #64748b; color: #fff; margin-top: 10px"
+          onclick="closeModal('trashModal')">
+          닫기
+        </button>
+      </div>
+    </div>
+
+    <script src="main.js"></script>
+  </body>
+</html>
