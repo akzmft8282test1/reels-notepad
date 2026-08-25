@@ -50,7 +50,7 @@ app.get("/admin", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// === 로그인 API (DB 에러 방지 처리 완료) ===
+// === 로그인 API (users 테이블 조회로 수정) ===
 app.post("/api/login", async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -63,9 +63,9 @@ app.post("/api/login", async (req, res) => {
 
     const cleanUsername = username.trim();
 
-    // maybeSingle() 대신 안전하게 select().eq() 사용 (중복 데이터 시 500 에러 방지)
+    // allowed_users -> users 테이블로 수정
     const { data: users, error } = await supabase
-      .from("allowed_users")
+      .from("users")
       .select("*")
       .eq("username", cleanUsername);
 
@@ -104,7 +104,7 @@ app.post("/api/login", async (req, res) => {
     req.session.user = {
       id: user.id,
       username: user.username,
-      name: user.name,
+      name: user.name || user.username,
       role: user.role || "Member",
     };
 
@@ -140,8 +140,9 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/users", async (req, res) => {
+  // allowed_users -> users 테이블로 수정
   const { data, error } = await supabase
-    .from("allowed_users")
+    .from("users")
     .select("username, name");
   if (error) return res.status(500).json({ error: error.message });
   res.json(data || []);
